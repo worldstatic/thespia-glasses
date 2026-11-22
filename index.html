@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Thespia HUD with a Blueprint cheat sheet for Unreal Engine 5.6 and Talk to Major.">
+  <meta name="description" content="Thespia HUD with a Blueprint cheat sheet for Unreal Engine 5.6, Scale Check, and Talk to Major.">
   <meta name="mrbd-web-app-capable" content="yes">
   <title>Thespia HUD</title>
   <link rel="icon" type="image/png" sizes="64x64" href="./icons/favicon-64.png">
@@ -13,7 +13,7 @@
 <body>
   <p class="preview-hint" hidden>
     Desktop preview · 600×600 validation target. On glasses, Neural Band and Cap Touch send Arrow keys and Enter.
-    Here, Left/Right change recipe steps or Major reply cards, Up/Down or Tab move between buttons, Enter activates.
+    Here, Left/Right change recipe steps, Major reply cards, or Scale Check entries. Up/Down or Tab move between buttons, except on the converter readout, where arrows change the value and the step. Enter activates.
   </p>
   <div class="preview-frame">
     <div id="app" class="app-shell">
@@ -21,6 +21,7 @@
     </div>
   </div>
   <script src="./major-transport.js" defer></script>
+  <script src="./scale.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

@@ -33,7 +33,14 @@
     },
     { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false },
     { id: "texture", title: "Photo to Texture", sub: "Coming soon", available: false },
-    { id: "scale", title: "Scale Check", sub: "Coming soon", available: false },
+    {
+      id: "scale",
+      title: "Scale Check",
+      sub: "Real size in UE units",
+      screen: "scale",
+      available: true,
+      buttonId: "open-scale-check",
+    },
     { id: "scan", title: "3D Scan", sub: "Coming soon", available: false },
   ];
 
@@ -42,6 +49,8 @@
 
   /** @type {{version:number, engine:string, mode:string, recipes:Array} | null} */
   let library = null;
+  /** @type {{version?:number, engine?:string, mannyHeightCm?:number, categories:Array} | null} */
+  let scaleLibrary = null;
   let aiConfigured = false;
   let lastFocusSelector = null;
   let clockTimer = null;
@@ -477,6 +486,10 @@
     return el("button", { type: "button", className: "secondary", id: "go-home", onClick: goHome }, "Home");
   }
 
+  function backButton() {
+    return el("button", { type: "button", className: "secondary", id: "go-back", onClick: goBack }, "Back");
+  }
+
   function recipeButton(recipe, sourceLabel) {
     return el(
       "button",
@@ -625,7 +638,7 @@
         el("article", { className: "card" }, [
           el("p", {
             className: "step-body",
-            text: `${title} is on the list, but it is not built yet. Blueprint Help and Talk to Major are ready to try.`,
+            text: `${title} is on the list, but it is not built yet. Blueprint Help, Talk to Major, and Scale Check are ready to try.`,
           }),
         ]),
       ]),
@@ -1638,6 +1651,748 @@
     );
   }
 
+  function scaleApi() {
+    return window.ThespiaScale || null;
+  }
+
+  function mannyHeightCm() {
+    if (scaleLibrary && Number(scaleLibrary.mannyHeightCm) > 0) return Number(scaleLibrary.mannyHeightCm);
+    const api = scaleApi();
+    return api ? api.MANNY_HEIGHT_CM : 180;
+  }
+
+  function scaleCategoryById(id) {
+    if (!scaleLibrary || !Array.isArray(scaleLibrary.categories)) return null;
+    return scaleLibrary.categories.find((category) => category.id === id) || null;
+  }
+
+  function scaleReadout(cm) {
+    const api = scaleApi();
+    if (!api) {
+      return { feetInches: "", cm: `${cm} cm`, uu: `${cm} uu`, meters: "", mannyPercent: "" };
+    }
+    return api.formatAll(cm, mannyHeightCm());
+  }
+
+  function formatScaleValue(value) {
+    if (!value) return "";
+    if (value.text) return value.text;
+    if (value.cm != null) {
+      const all = scaleReadout(value.cm);
+      return `${all.feetInches}  ·  ${all.cm}  ·  ${all.uu}`;
+    }
+    return "";
+  }
+
+  function scaleKindLabel(kind) {
+    const api = scaleApi();
+    return api ? api.kindLabel(kind) : "";
+  }
+
+  function renderScale() {
+    const cats = scaleLibrary && Array.isArray(scaleLibrary.categories) ? scaleLibrary.categories.length : 0;
+    const api = scaleApi();
+    const saved = api ? api.loadMeasurements().length : 0;
+    return screen([
+      header("Scale Check", "Real-world size", "1 uu = 1 cm · UE 5.6"),
+      el("div", { className: "content stack" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile primary",
+            id: "open-scale-library",
+            onClick: () => navigate({ screen: "scale-library" }),
+          },
+          [
+            el("span", { className: "tile-title", text: "Reference library" }),
+            el("span", {
+              className: "tile-sub",
+              text: cats ? `${cats} categories for doors, cover, characters, and more` : "Library unavailable",
+            }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-scale-convert",
+            onClick: () =>
+              navigate({
+                screen: "scale-convert",
+                cm: mannyHeightCm(),
+                stepId: "1in",
+                query: "",
+                notice: "",
+              }),
+          },
+          [
+            el("span", { className: "tile-title", text: "Converter" }),
+            el("span", { className: "tile-sub", text: "Feet, inches, cm, uu, and percent of Manny" }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-scale-pace",
+            onClick: () =>
+              navigate({
+                screen: "scale-pace",
+                steps: 0,
+                strideCm: scaleApi() ? scaleApi().loadStride() : 75,
+                notice: "",
+              }),
+          },
+          [
+            el("span", { className: "tile-title", text: "Pace measure" }),
+            el("span", { className: "tile-sub", text: "Count steps with Enter while you walk" }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-scale-mine",
+            onClick: () => navigate({ screen: "scale-mine" }),
+          },
+          [
+            el("span", { className: "tile-title", text: "My measurements" }),
+            el("span", {
+              className: "tile-sub",
+              text: saved ? `${saved} saved on this device` : "Save a named size on this device",
+            }),
+          ]
+        ),
+      ]),
+      el("div", { className: "footer" }, [homeButton()]),
+    ]);
+  }
+
+  function renderScaleLibrary() {
+    const categories = (scaleLibrary && scaleLibrary.categories) || [];
+    const body = categories.length
+      ? el(
+          "ul",
+          { className: "list" },
+          categories.map((category) =>
+            el("li", null, [
+              el(
+                "button",
+                {
+                  type: "button",
+                  className: "tile",
+                  onClick: () => navigate({ screen: "scale-category", categoryId: category.id, entryIndex: 0 }),
+                },
+                [
+                  el("span", { className: "tile-title", text: category.title }),
+                  el("span", {
+                    className: "tile-sub",
+                    text: `${category.entries ? category.entries.length : 0} · ${category.summary || ""}`,
+                  }),
+                ]
+              ),
+            ])
+          )
+        )
+      : el("p", {
+          className: "status",
+          dataset: { kind: "error" },
+          text: "The reference library could not be loaded. Converter, pace, and saved measurements still work.",
+        });
+    return screen([
+      header("Scale Check", "Reference library", "Standards, code, engine defaults, and conventions"),
+      el("div", { className: "content" }, [body]),
+      el("div", { className: "footer" }, [backButton(), homeButton()]),
+    ]);
+  }
+
+  function renderScaleEntryValues(entry) {
+    const values = (entry && entry.values) || [];
+    return values.map((value) =>
+      el("p", { className: "scale-line" }, [
+        el("span", { className: "scale-label", text: value.label ? `${value.label}` : "Size" }),
+        el("span", { className: "scale-line-value", text: formatScaleValue(value) }),
+      ])
+    );
+  }
+
+  function renderScaleCategory(state) {
+    const category = scaleCategoryById(state.categoryId);
+    const entries = (category && category.entries) || [];
+    const index = Math.max(0, Math.min(Math.max(entries.length - 1, 0), state.entryIndex || 0));
+    const entry = entries[index];
+    if (!category || !entry) {
+      return screen([
+        header("Scale Check", "Reference library", "Entry missing"),
+        el("div", { className: "content" }, [
+          el("p", { className: "status", dataset: { kind: "error" }, text: "That entry is not in the library." }),
+        ]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ]);
+    }
+    const panel = el(
+      "article",
+      {
+        className: "step-card scale-readout",
+        tabIndex: 0,
+        id: "scale-entry-panel",
+        attrs: { "aria-label": `${entry.title}, ${index + 1} of ${entries.length}` },
+      },
+      [
+        el("p", { className: "step-index", text: `${category.title} · ${index + 1} of ${entries.length}` }),
+        el("h2", { text: entry.title }),
+        el("p", { className: "kind-tag", text: scaleKindLabel(entry.kind) }),
+        el("div", { className: "scale-lines" }, renderScaleEntryValues(entry)),
+        entry.kindNote ? el("p", { className: "scale-note", text: entry.kindNote }) : null,
+        entry.tip ? el("p", { className: "step-body", text: entry.tip }) : null,
+      ]
+    );
+    return screen(
+      [
+        header("Scale Check", category.title, "Left or right to browse"),
+        el("div", { className: "content" }, [panel]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ],
+      "scale-screen"
+    );
+  }
+
+  function updateScaleCategory(state, entryIndex) {
+    const category = scaleCategoryById(state.categoryId);
+    const entries = (category && category.entries) || [];
+    const nextIndex = Math.max(0, Math.min(Math.max(entries.length - 1, 0), entryIndex));
+    const next = { ...state, entryIndex: nextIndex };
+    history.replaceState(next, "");
+    render(next);
+  }
+
+  function applyScaleQuery(state) {
+    const api = scaleApi();
+    const input = document.getElementById("scale-parse-input");
+    const query = input && input.value ? input.value.trim() : state.query || "";
+    if (!query) {
+      navigate({ ...state, query: "", notice: "Enter a size, like 6 ft 8 or 203 cm.", noticeKind: "error" }, { push: false });
+      return;
+    }
+    if (!api) {
+      navigate({ ...state, query, notice: "Converter is unavailable.", noticeKind: "error" }, { push: false });
+      return;
+    }
+    const parsed = api.parseLength(query);
+    if (!parsed.ok) {
+      navigate({ ...state, query, notice: parsed.message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    navigate({ ...state, cm: parsed.cm, query, notice: "", noticeKind: "" }, { push: false });
+  }
+
+  function updateConverter(state, patch) {
+    const next = { ...state, ...patch };
+    history.replaceState(next, "");
+    render(next);
+  }
+
+  function nudgeConverterValue(state, direction) {
+    const api = scaleApi();
+    if (!api) return;
+    const step = api.stepByIndex(api.stepIndex(state.stepId));
+    const cm = api.addCm(state.cm, direction * step.cm);
+    updateConverter(state, { cm, notice: "", noticeKind: "" });
+  }
+
+  function nudgeConverterStep(state, direction) {
+    const api = scaleApi();
+    if (!api) return;
+    const step = api.stepByIndex(api.stepIndex(state.stepId) + direction);
+    updateConverter(state, { stepId: step.id, notice: "", noticeKind: "" });
+  }
+
+  function renderScaleConvert(state) {
+    const api = scaleApi();
+    const cm = Number(state.cm) > 0 ? Number(state.cm) : mannyHeightCm();
+    const step = api ? api.stepByIndex(api.stepIndex(state.stepId || "1in")) : { id: "1in", label: "1 in" };
+    const all = scaleReadout(cm);
+    const query = state.query || "";
+    const notice = state.notice || "";
+    const panel = el(
+      "article",
+      {
+        className: "step-card scale-readout",
+        tabIndex: 0,
+        id: "scale-value-panel",
+        attrs: { "aria-label": "Converted size" },
+      },
+      [
+        el("p", { className: "step-index", text: "Converted size" }),
+        el("p", { className: "scale-main", text: all.feetInches }),
+        el("p", { className: "scale-lines", text: `${all.cm}  ·  ${all.uu}` }),
+        el("p", { className: "scale-lines", text: all.meters }),
+        el("p", { className: "scale-note", text: all.mannyPercent }),
+        el("p", { className: "hint", text: `Step ${step.label} · Up/Down change the value · Left/Right change the step` }),
+      ]
+    );
+    return screen(
+      [
+        header("Scale Check", "Converter", "1 uu = 1 cm"),
+        el("div", { className: "content stack" }, [
+          panel,
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "scale-parse-input", text: "Type or dictate a size" }),
+            el("input", {
+              id: "scale-parse-input",
+              type: "search",
+              name: "scale-size",
+              autocomplete: "off",
+              placeholder: "6 ft 8 or 203 cm",
+              value: query,
+              attrs: { enterkeyhint: "done", spellcheck: "false" },
+            }),
+            el("p", {
+              className: "hint",
+              text: "On glasses, activate this field to dictate. A bare number is read as centimeters, which are also uu.",
+            }),
+          ]),
+          notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            { type: "button", className: "secondary primary", id: "apply-scale-parse", onClick: () => applyScaleQuery(currentState()) },
+            "Apply"
+          ),
+          backButton(),
+          homeButton(),
+        ]),
+      ],
+      "scale-screen"
+    );
+  }
+
+  function updatePace(state, patch) {
+    const next = { ...state, ...patch };
+    history.replaceState(next, "");
+    render(next);
+  }
+
+  function addPaceStep() {
+    const state = currentState();
+    if (!state || state.screen !== "scale-pace") return;
+    const nextSteps = Math.max(0, (state.steps || 0) + 1);
+    updatePace(state, { steps: nextSteps, notice: "", noticeKind: "" });
+  }
+
+  function resetPace() {
+    const state = currentState();
+    if (!state || state.screen !== "scale-pace") return;
+    updatePace(state, { steps: 0, notice: "Count cleared.", noticeKind: "ok" });
+  }
+
+  function saveStrideFromForm() {
+    const api = scaleApi();
+    const state = currentState();
+    const input = document.getElementById("scale-stride-input");
+    const query = input && input.value ? input.value.trim() : "";
+    if (!api) return;
+    const parsed = query ? api.parseLength(query) : { ok: true, cm: state.strideCm, message: "" };
+    if (!parsed.ok) {
+      updatePace(state, { notice: parsed.message, noticeKind: "error" });
+      return;
+    }
+    const saved = api.saveStride(parsed.cm);
+    updatePace(state, {
+      strideCm: saved.ok ? saved.cm : state.strideCm,
+      notice: saved.message,
+      noticeKind: saved.ok ? "ok" : "error",
+    });
+  }
+
+  function renderScalePace(state) {
+    const api = scaleApi();
+    const strideCm = Number(state.strideCm) > 0 ? Number(state.strideCm) : api ? api.loadStride() : 75;
+    const steps = Math.max(0, state.steps || 0);
+    const distance = api ? api.paceDistance(steps, strideCm) : { cm: steps * strideCm, steps, strideCm };
+    const all = scaleReadout(distance.cm);
+    const strideLabel = scaleReadout(strideCm);
+    const notice = state.notice || "";
+    return screen(
+      [
+        header("Scale Check", "Pace measure", "Enter counts a step"),
+        el("div", { className: "content stack" }, [
+          el("article", { className: "step-card scale-readout", id: "scale-pace-panel" }, [
+            el("p", { className: "step-index", text: `${steps} step${steps === 1 ? "" : "s"}` }),
+            el("p", { className: "scale-main", text: all.uu }),
+            el("p", { className: "scale-lines", text: `${all.feetInches}  ·  ${all.cm}` }),
+            el("p", { className: "scale-lines", text: all.meters }),
+            el("p", { className: "scale-note", text: `Stride ${strideLabel.cm}  ·  ${strideLabel.feetInches}` }),
+          ]),
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "scale-stride-input", text: "Your stride" }),
+            el("input", {
+              id: "scale-stride-input",
+              type: "search",
+              name: "scale-stride",
+              autocomplete: "off",
+              placeholder: "75 cm or 2 ft 6 in",
+              value: "",
+              attrs: { enterkeyhint: "done", spellcheck: "false" },
+            }),
+            el("p", {
+              className: "hint",
+              text: "Default is 75 cm. Save once, then keep Enter on Step while you walk. This stays on the device.",
+            }),
+          ]),
+          notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
+        ]),
+        el("div", { className: "footer" }, [
+          el("button", { type: "button", className: "secondary primary", id: "scale-step", onClick: addPaceStep }, "Step"),
+          el("button", { type: "button", className: "secondary", id: "scale-reset", onClick: resetPace }, "Reset"),
+          el("button", { type: "button", className: "secondary", id: "save-stride", onClick: saveStrideFromForm }, "Save stride"),
+          backButton(),
+        ]),
+      ],
+      "scale-screen"
+    );
+  }
+
+  function renderScaleMine() {
+    const api = scaleApi();
+    const items = api ? api.loadMeasurements() : [];
+    const body = items.length
+      ? el(
+          "ul",
+          { className: "list" },
+          items.map((item) => {
+            const all = scaleReadout(item.cm);
+            return el("li", null, [
+              el(
+                "button",
+                {
+                  type: "button",
+                  className: "tile",
+                  onClick: () => navigate({ screen: "scale-detail", id: item.id }),
+                },
+                [
+                  el("span", { className: "tile-title", text: item.name }),
+                  el("span", { className: "tile-sub", text: `${all.feetInches}  ·  ${all.cm}  ·  ${all.uu}` }),
+                ]
+              ),
+            ]);
+          })
+        )
+      : el("p", { className: "muted", text: "Nothing saved yet. Add a name and a size; it stays on this device." });
+    return screen([
+      header("Scale Check", "My measurements", "Saved on this device only"),
+      el("div", { className: "content stack" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile primary",
+            id: "open-scale-edit",
+            onClick: () => navigate({ screen: "scale-edit", id: null, name: "", size: "", notice: "" }),
+          },
+          [
+            el("span", { className: "tile-title", text: "New measurement" }),
+            el("span", { className: "tile-sub", text: "Name a door, counter, or other size you see" }),
+          ]
+        ),
+        body,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "open-scale-backup",
+            onClick: () => navigate({ screen: "scale-backup" }),
+          },
+          "Export / Import"
+        ),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function renderScaleDetail(state) {
+    const api = scaleApi();
+    const item = api ? api.getMeasurement(state.id) : null;
+    if (!item) {
+      return screen([
+        header("Scale Check", "My measurements", "Not found"),
+        el("div", { className: "content" }, [
+          el("p", { className: "status", dataset: { kind: "error" }, text: "That measurement is not on this device." }),
+        ]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ]);
+    }
+    const all = scaleReadout(item.cm);
+    return screen([
+      header("Scale Check", item.name, "Saved on this device"),
+      el("div", { className: "content" }, [
+        el("article", { className: "step-card scale-readout" }, [
+          el("p", { className: "scale-main", text: all.feetInches }),
+          el("p", { className: "scale-lines", text: `${all.cm}  ·  ${all.uu}` }),
+          el("p", { className: "scale-lines", text: all.meters }),
+          el("p", { className: "scale-note", text: all.mannyPercent }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "open-scale-in-converter",
+            onClick: () =>
+              navigate({ screen: "scale-convert", cm: item.cm, stepId: "1in", query: "", notice: "" }),
+          },
+          "Converter"
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "edit-measurement",
+            onClick: () =>
+              navigate({
+                screen: "scale-edit",
+                id: item.id,
+                name: item.name,
+                size: api.formatCm(item.cm),
+                notice: "",
+              }),
+          },
+          "Edit"
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "delete-measurement",
+            onClick: () => navigate({ screen: "scale-delete", id: item.id, name: item.name }),
+          },
+          "Delete"
+        ),
+        backButton(),
+      ]),
+    ]);
+  }
+
+  function saveMeasurementFromForm() {
+    const api = scaleApi();
+    const state = currentState();
+    const nameInput = document.getElementById("scale-measure-name");
+    const sizeInput = document.getElementById("scale-measure-size");
+    const name = nameInput && nameInput.value ? nameInput.value.trim() : "";
+    const size = sizeInput && sizeInput.value ? sizeInput.value.trim() : "";
+    if (!api) return;
+    if (!name) {
+      navigate(
+        { ...state, name, size, notice: "Add a name first.", noticeKind: "error" },
+        { push: false }
+      );
+      return;
+    }
+    const parsed = api.parseLength(size);
+    if (!parsed.ok) {
+      navigate({ ...state, name, size, notice: parsed.message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    const result = api.upsertMeasurement({ id: state.id || undefined, name, cm: parsed.cm });
+    if (!result.ok) {
+      const message =
+        result.reason === "full"
+          ? "You already have the maximum number of measurements on this device."
+          : "Could not save on this device.";
+      navigate({ ...state, name, size, notice: message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    navigate({ screen: "scale-detail", id: result.item.id }, { push: false });
+  }
+
+  function renderScaleEdit(state) {
+    const isEdit = Boolean(state.id);
+    const name = state.name || "";
+    const size = state.size || "";
+    const notice = state.notice || "";
+    const api = scaleApi();
+    const preview = size && api ? api.parseLength(size) : null;
+    const previewText =
+      preview && preview.ok
+        ? (() => {
+            const all = scaleReadout(preview.cm);
+            return `${all.feetInches}  ·  ${all.cm}  ·  ${all.uu}`;
+          })()
+        : "";
+    return screen([
+      header("Scale Check", isEdit ? "Edit measurement" : "New measurement", "Saved on this device only"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "scale-measure-name", text: "Name" }),
+          el("input", {
+            id: "scale-measure-name",
+            type: "search",
+            name: "scale-measure-name",
+            autocomplete: "off",
+            placeholder: "Write or speak a name",
+            value: name,
+            attrs: { enterkeyhint: "next", maxlength: String(api ? api.NAME_MAX : 80), spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "scale-measure-size", text: "Size" }),
+          el("input", {
+            id: "scale-measure-size",
+            type: "search",
+            name: "scale-measure-size",
+            autocomplete: "off",
+            placeholder: "6 ft 8 or 203 cm",
+            value: size,
+            attrs: { enterkeyhint: "done", spellcheck: "false" },
+          }),
+          el("p", {
+            className: "hint",
+            text: "On glasses, activate a field to dictate. A bare number is read as centimeters, which are also uu.",
+          }),
+          previewText ? el("p", { className: "scale-note", text: previewText }) : null,
+        ]),
+        notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          { type: "button", className: "secondary primary", id: "save-measurement", onClick: saveMeasurementFromForm },
+          "Save"
+        ),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function confirmDeleteMeasurement() {
+    const api = scaleApi();
+    const state = currentState();
+    if (!api || !state.id) return;
+    const ok = api.deleteMeasurement(state.id);
+    if (!ok) {
+      navigate({ ...state, notice: "Could not delete that measurement.", noticeKind: "error" }, { push: false });
+      return;
+    }
+    navigate({ screen: "scale-mine" }, { push: false });
+  }
+
+  function renderScaleDelete(state) {
+    const name = state.name || "this measurement";
+    return screen([
+      header("Scale Check", "Delete measurement", "This cannot be undone on this device"),
+      el("div", { className: "content stack" }, [
+        el("article", { className: "card" }, [
+          el("p", { className: "step-body", text: `Remove "${name}" from this device?` }),
+        ]),
+        state.notice
+          ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } })
+          : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "confirm-delete-measurement",
+            onClick: confirmDeleteMeasurement,
+          },
+          "Delete"
+        ),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function importMeasurementsFromForm() {
+    const api = scaleApi();
+    const area = document.getElementById("scale-backup-blob");
+    const textValue = area && area.value ? area.value : "";
+    if (!api) return;
+    const result = api.importMeasurementsBlob(textValue);
+    navigate(
+      {
+        screen: "scale-backup",
+        blob: result.ok ? api.exportMeasurementsBlob() : textValue,
+        notice: result.message,
+        noticeKind: result.ok ? "ok" : "error",
+      },
+      { push: false }
+    );
+  }
+
+  function renderScaleBackup(state) {
+    const api = scaleApi();
+    const blob = state.blob != null ? state.blob : api ? api.exportMeasurementsBlob() : "{\n  \"version\": 1,\n  \"items\": []\n}";
+    const notice = state.notice || "";
+    return screen([
+      header("Scale Check", "Export / Import", "Backup stays on this device until you copy it"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "scale-backup-blob", text: "JSON text blob" }),
+          el("textarea", {
+            id: "scale-backup-blob",
+            className: "field-area",
+            name: "scale-backup",
+            value: blob,
+            attrs: { spellcheck: "false", rows: "8", autocomplete: "off" },
+          }),
+          el("p", {
+            className: "hint",
+            text: "Copy this to back up your measurements, or paste a backup and choose Import. Nothing is uploaded.",
+          }),
+        ]),
+        notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "refresh-scale-backup",
+            onClick: () =>
+              navigate(
+                {
+                  screen: "scale-backup",
+                  blob: scaleApi() ? scaleApi().exportMeasurementsBlob() : "",
+                  notice: "",
+                  noticeKind: "",
+                },
+                { push: false }
+              ),
+          },
+          "Refresh export"
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "import-measurements",
+            onClick: importMeasurementsFromForm,
+          },
+          "Import"
+        ),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
   function render(state) {
     const screenName = state && state.screen ? state.screen : "home";
     if (screenName !== "home") stopClock();
@@ -1691,6 +2446,46 @@
       case "major-settings":
         view = renderMajorSettings();
         lastFocusSelector = "#major-kind";
+        break;
+      case "scale":
+        view = renderScale();
+        lastFocusSelector = "#open-scale-library";
+        break;
+      case "scale-library":
+        view = renderScaleLibrary();
+        lastFocusSelector = "button.tile";
+        break;
+      case "scale-category":
+        view = renderScaleCategory(state);
+        lastFocusSelector = "#scale-entry-panel";
+        break;
+      case "scale-convert":
+        view = renderScaleConvert(state);
+        lastFocusSelector = "#scale-value-panel";
+        break;
+      case "scale-pace":
+        view = renderScalePace(state);
+        lastFocusSelector = "#scale-step";
+        break;
+      case "scale-mine":
+        view = renderScaleMine();
+        lastFocusSelector = "#open-scale-edit";
+        break;
+      case "scale-detail":
+        view = renderScaleDetail(state);
+        lastFocusSelector = "#open-scale-in-converter";
+        break;
+      case "scale-edit":
+        view = renderScaleEdit(state);
+        lastFocusSelector = "#scale-measure-name";
+        break;
+      case "scale-delete":
+        view = renderScaleDelete(state);
+        lastFocusSelector = "#confirm-delete-measurement";
+        break;
+      case "scale-backup":
+        view = renderScaleBackup(state);
+        lastFocusSelector = "#scale-backup-blob";
         break;
       default:
         view = renderHome();
@@ -1848,7 +2643,67 @@
       addStepFromForm();
       return;
     }
+    if (event.key === "Enter" && event.target && event.target.id === "scale-parse-input") {
+      event.preventDefault();
+      applyScaleQuery(currentState());
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "scale-stride-input") {
+      event.preventDefault();
+      saveStrideFromForm();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "scale-measure-name") {
+      event.preventDefault();
+      const size = document.getElementById("scale-measure-size");
+      if (size && typeof size.focus === "function") size.focus();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "scale-measure-size") {
+      event.preventDefault();
+      saveMeasurementFromForm();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "scale-value-panel") {
+      event.preventDefault();
+      const input = document.getElementById("scale-parse-input");
+      if (input && typeof input.focus === "function") input.focus();
+      return;
+    }
     if (isTypingTarget(event.target)) return;
+    if (state && state.screen === "scale-pace") {
+      const id = event.target && event.target.id;
+      if (event.key === "Enter" && id !== "scale-reset" && id !== "go-back" && id !== "go-home" && id !== "save-stride") {
+        event.preventDefault();
+        addPaceStep();
+        return;
+      }
+    }
+    if (state && state.screen === "scale-convert") {
+      const onPanel = event.target && event.target.id === "scale-value-panel";
+      if (onPanel) {
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          nudgeConverterValue(state, 1);
+          return;
+        }
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          nudgeConverterValue(state, -1);
+          return;
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          nudgeConverterStep(state, -1);
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          nudgeConverterStep(state, 1);
+          return;
+        }
+      }
+    }
     if (state && state.screen === "recipe") {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -1856,6 +2711,16 @@
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         updateStep(state, (state.step || 0) + 1);
+      }
+      return;
+    }
+    if (state && state.screen === "scale-category") {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        updateScaleCategory(state, (state.entryIndex || 0) - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        updateScaleCategory(state, (state.entryIndex || 0) + 1);
       }
       return;
     }
@@ -1875,6 +2740,18 @@
     const data = await response.json();
     if (!data || !Array.isArray(data.recipes)) throw new Error("invalid library");
     library = data;
+  }
+
+  async function loadScaleLibrary() {
+    try {
+      const response = await fetch("./scale-library.json");
+      const data = await response.json();
+      if (!data || !Array.isArray(data.categories)) throw new Error("invalid scale library");
+      scaleLibrary = data;
+    } catch (err) {
+      console.warn("Could not load the Scale Check library:", err);
+      scaleLibrary = { version: 1, mannyHeightCm: 180, categories: [] };
+    }
   }
 
   async function checkHealth() {
@@ -1912,6 +2789,7 @@
       return;
     }
     await checkHealth();
+    await loadScaleLibrary();
     render(currentState());
     registerWorker();
   }

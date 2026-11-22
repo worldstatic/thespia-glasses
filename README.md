@@ -1,6 +1,6 @@
 # Thespia HUD (Blueprint Help v1)
 
-A Meta Ray-Ban Display Web App: a glasses home screen with **Blueprint Help** for Unreal Engine 5.6 (Blueprints only) and **Talk to Major**. Built for Thespia.
+A Meta Ray-Ban Display Web App: a glasses home screen with **Blueprint Help** for Unreal Engine 5.6 (Blueprints only), **Scale Check**, and **Talk to Major**. Built for Thespia.
 
 The static site is meant to be served from the repository root on GitHub Pages (`index.html` at `/`). The optional Python server is only for local preview and AI answers; it is not required for the glasses app.
 
@@ -16,7 +16,7 @@ A large window shows a 600×600 preview frame and keyboard hints. To preview at 
 
 Keyboard stand-ins for the Neural Band / Cap Touch:
 
-- **Left / Right** — previous or next recipe step, or Talk to Major reply card
+- **Left / Right** — previous or next recipe step, Talk to Major reply card, or Scale Check library entry. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value
 - **Up / Down** or **Tab** — move between buttons (and spatial navigation if you start Chrome with `--enable-spatial-navigation`)
 - **Enter** — activate the focused button, or submit the question, message, recipe title, or step field
 
@@ -36,13 +36,24 @@ The app opens to a HUD home screen:
 
 - A clock and date, updated on the device
 - A **Next up** line you can set. It is stored in `localStorage` on the glasses (or the preview browser) only
-- A tile grid: **Blueprint Help** and **Talk to Major** work now. **Overlock Walk**, **Photo to Texture**, **Scale Check**, and **3D Scan** are marked Coming soon
+- A tile grid: **Blueprint Help**, **Talk to Major**, and **Scale Check** work now. **Overlock Walk**, **Photo to Texture**, and **3D Scan** are marked Coming soon
 
 ## Your own Blueprint recipes
 
 In **Blueprint Help**, choose **New recipe**. Enter a title, then add steps one at a time (the `search` and `text` fields open on-glasses dictation). **Add step** keeps you on the editor; **Done** saves the recipe on this device. You can edit or delete a saved recipe, and your recipes show up in search results and Favorites.
 
 **Export / Import** copies your recipes as a JSON text blob for backup, or pastes a backup back in. Custom recipes stay in `localStorage` only. Do not paste personal or work data into a recipe if you later share a screenshot or backup file.
+
+## Scale Check
+
+**Scale Check** is a walking reference for real-world sizes next to Unreal Engine 5.6 units (`1 uu = 1 cm`). It is meant for Thespia level design (FPS, RTS, and base building).
+
+- **Reference library** — doors, stairs and ramps, ceilings and floors, cover heights, counters, vehicles, fences and walls, and character defaults. Each entry shows feet/inches, centimeters, and uu, plus a short level-design tip. Values are labeled as a standard, a code figure, a UE 5.6 default, a typical range, or a convention (not a measurement).
+- **Converter** — change a value with Up/Down, change the step with Left/Right, or dictate a size such as `6 ft 8` or `203 cm` in the search field. The readout shows feet/inches, cm, uu, meters, and a percentage of Manny’s 180 cm reference height.
+- **Pace measure** — set your stride once (default 75 cm) and press Enter to count steps while you walk. The total is shown in uu.
+- **My measurements** — save a named size on this device, then export or import a JSON text blob, the same way as custom Blueprint recipes.
+
+Favorites, recipes, Next up, measurements, and your stride stay in `localStorage` on the device.
 
 ## Talk to Major
 
@@ -62,7 +73,7 @@ The app must be on a public HTTPS URL (GitHub Pages once enabled). In the Meta A
 
 ## Privacy
 
-This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Next up, and Talk to Major settings stay in `localStorage` on the device. A live bridge URL or token, if you add one, is entered on the glasses and is never part of this source.
+This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Next up, Scale Check measurements, your stride, and Talk to Major settings stay in `localStorage` on the device. A live bridge URL or token, if you add one, is entered on the glasses and is never part of this source.
 
 ## What this app assumes from Meta's docs
 
@@ -76,9 +87,11 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 
 ## File list
 
-- `index.html`, `styles.css`, `app.js` — HUD home screen, Blueprint Help, and Talk to Major
+- `index.html`, `styles.css`, `app.js` — HUD home screen, Blueprint Help, Scale Check, and Talk to Major
 - `major-transport.js` — pluggable message transport (mock preview, optional on-device HTTPS bridge)
+- `scale.js` — length parsing, unit conversion, and measurement storage helpers
 - `library.json` — 15 UE 5.6 Blueprint recipes
+- `scale-library.json` — Scale Check reference sizes and tips
 - `sw.js` — offline app-shell cache
 - `icons/` — monochrome PNG icons (64, 128, 512)
 - `.well-known/meta-wearables-manifest.json` — glasses app name and icon

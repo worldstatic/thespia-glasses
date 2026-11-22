@@ -1,0 +1,522 @@
+{
+  "version": 1,
+  "engine": "UE 5.6",
+  "unitNote": "1 Unreal unit (uu) = 1 cm",
+  "mannyHeightCm": 180,
+  "categories": [
+    {
+      "id": "doors",
+      "title": "Doors and openings",
+      "summary": "Common door sizes and FPS openings",
+      "entries": [
+        {
+          "id": "us-interior-door-30",
+          "title": "US interior door, 30 in",
+          "kind": "standard",
+          "kindNote": "Common US interior door, 80 × 30 in.",
+          "values": [
+            { "label": "Height", "cm": 203.2 },
+            { "label": "Width", "cm": 76.2 }
+          ],
+          "tip": "FPS doors are often scaled 1.2–1.5× (about 244–305 uu tall) so openings read clearly at speed."
+        },
+        {
+          "id": "us-interior-door-32",
+          "title": "US interior door, 32 in",
+          "kind": "standard",
+          "kindNote": "Common US interior door, 80 × 32 in.",
+          "values": [
+            { "label": "Height", "cm": 203.2 },
+            { "label": "Width", "cm": 81.28 }
+          ],
+          "tip": "A 32 in leaf is a frequent bedroom or hall door. Scale it up in an FPS if the silhouette feels tight."
+        },
+        {
+          "id": "us-exterior-door-36",
+          "title": "US exterior door, 36 in",
+          "kind": "standard",
+          "kindNote": "Common US exterior or passage door, 80 × 36 in. ADA clear width of 32 in usually needs this leaf size.",
+          "values": [
+            { "label": "Height", "cm": 203.2 },
+            { "label": "Width", "cm": 91.44 }
+          ],
+          "tip": "Use this as a real-world front door. In an FPS, a 36 in opening can still feel narrow in first person."
+        },
+        {
+          "id": "commercial-door-84",
+          "title": "Commercial door, 7 ft",
+          "kind": "typical",
+          "kindNote": "84 in height is common on commercial doors. 80 in is still used too.",
+          "values": [
+            { "label": "Height", "cm": 213.36 },
+            { "label": "Width", "cm": 91.44 }
+          ],
+          "tip": "A slightly taller leaf helps public spaces feel bigger. Pair with a wider opening for two-person traffic."
+        },
+        {
+          "id": "door-thickness",
+          "title": "Door thickness",
+          "kind": "standard",
+          "kindNote": "Common US slab thicknesses.",
+          "values": [
+            { "label": "Interior", "cm": 3.49 },
+            { "label": "Exterior", "cm": 4.45 }
+          ],
+          "tip": "1⅜ in interior, 1¾ in exterior. Keep door meshes close to this unless you want a heavy vault or bunker door."
+        },
+        {
+          "id": "fps-corridor-width",
+          "title": "FPS corridor width",
+          "kind": "convention",
+          "kindNote": "Level-design convention, not a building measurement.",
+          "values": [
+            { "label": "Tight", "cm": 120 },
+            { "label": "Comfortable", "cm": 250 },
+            { "label": "Wide", "cm": 300 }
+          ],
+          "tip": "120–150 uu feels tight in first person. 200–300 uu is a comfortable combat hall. Add pockets of 100 uu cover."
+        }
+      ]
+    },
+    {
+      "id": "stairs",
+      "title": "Stairs and ramps",
+      "summary": "Risers, treads, ramps, and walkable slopes",
+      "entries": [
+        {
+          "id": "stair-7-11",
+          "title": "Comfortable stair, 7-11",
+          "kind": "convention",
+          "kindNote": "The 7-11 rule of thumb: 7 in riser and 11 in tread, about 32.5°. Not a single legal standard.",
+          "values": [
+            { "label": "Riser", "cm": 17.78 },
+            { "label": "Tread", "cm": 27.94 },
+            { "label": "Pitch", "text": "32.5°" }
+          ],
+          "tip": "A good first setting for walkable stairs in Thespia. Keep flights readable; bare 7-11 can look thin in first person."
+        },
+        {
+          "id": "irc-stair-limits",
+          "title": "US residential stair limits",
+          "kind": "code",
+          "kindNote": "International Residential Code figures widely used in the US.",
+          "values": [
+            { "label": "Max riser", "cm": 19.69 },
+            { "label": "Min tread", "cm": 25.4 },
+            { "label": "Min width", "cm": 91.44 },
+            { "label": "Min headroom", "cm": 203.2 }
+          ],
+          "tip": "7¾ in max riser, 10 in min tread, 36 in min width, 6 ft 8 in headroom. Do not exceed these if a space should feel build-code real."
+        },
+        {
+          "id": "ada-ramp",
+          "title": "ADA ramp",
+          "kind": "code",
+          "kindNote": "ADA maximum slope is 1:12. Max rise per run is 30 in. Min clear width is 36 in.",
+          "values": [
+            { "label": "Slope", "text": "1:12  ·  4.76°  ·  8.33%" },
+            { "label": "Max rise per run", "cm": 76.2 },
+            { "label": "Min width", "cm": 91.44 }
+          ],
+          "tip": "Use 1:12 for accessible ramps. A walkable combat ramp can be steeper, but stay under the 44.77° engine limit or the character will slide."
+        },
+        {
+          "id": "stair-pitch-range",
+          "title": "Typical stair pitch",
+          "kind": "typical",
+          "kindNote": "Comfortable stairs usually fall between 30° and 37°.",
+          "values": [
+            { "label": "Usual range", "text": "30–37°" },
+            { "label": "UE max walkable", "text": "44.77°" }
+          ],
+          "tip": "Above about 37° stairs feel steep. Anything at or over 44.77° is not walkable with default Character Movement."
+        }
+      ]
+    },
+    {
+      "id": "ceilings",
+      "title": "Ceilings and floors",
+      "summary": "Room height and modular grid sizes",
+      "entries": [
+        {
+          "id": "ceiling-8ft",
+          "title": "US residential ceiling, 8 ft",
+          "kind": "standard",
+          "kindNote": "The common finished ceiling height in US houses.",
+          "values": [
+            { "label": "Height", "cm": 243.84 }
+          ],
+          "tip": "A solid default for interiors. In an FPS, 8 ft can feel low once you add lights, beams, or a taller capsule, so many levels use 270–300 uu."
+        },
+        {
+          "id": "ceiling-9ft",
+          "title": "Residential ceiling, 9 ft",
+          "kind": "typical",
+          "kindNote": "Common in newer US houses, not a single required standard.",
+          "values": [
+            { "label": "Height", "cm": 274.32 }
+          ],
+          "tip": "Gives a little more headroom for lights and destruction debris without jumping to a hall or lobby scale."
+        },
+        {
+          "id": "ceiling-7ft-min",
+          "title": "US minimum habitable ceiling",
+          "kind": "code",
+          "kindNote": "US IRC minimum for habitable rooms is 7 ft. Some exceptions exist for beams and sloped ceilings.",
+          "values": [
+            { "label": "Height", "cm": 213.36 }
+          ],
+          "tip": "Use 7 ft for basements, bunkers, or tight safe rooms. It will feel cramped in first person, which can be the point."
+        },
+        {
+          "id": "grid-module",
+          "title": "Base-building grid module",
+          "kind": "convention",
+          "kindNote": "A common RTS and foundation increment, not a real-world measurement.",
+          "values": [
+            { "label": "Small cell", "cm": 100 },
+            { "label": "Large cell", "cm": 200 }
+          ],
+          "tip": "1 m or 2 m cells snap walls, foundations, and fences cleanly in uu. Pick one grid and keep door openings on that module."
+        }
+      ]
+    },
+    {
+      "id": "cover",
+      "title": "Cover heights",
+      "summary": "Crouch, stand, and vault heights",
+      "entries": [
+        {
+          "id": "crouch-capsule",
+          "title": "Default crouched capsule",
+          "kind": "engine",
+          "kindNote": "ACharacter CrouchedHalfHeight is 40 uu in UE 5.6, so the crouched capsule is 80 cm tall.",
+          "values": [
+            { "label": "Half-height", "cm": 40 },
+            { "label": "Overall height", "cm": 80 }
+          ],
+          "tip": "Cover has to be taller than 80 uu to hide a default crouched character. 90–100 uu is the usual starting point."
+        },
+        {
+          "id": "crouch-cover",
+          "title": "Crouch cover",
+          "kind": "convention",
+          "kindNote": "Level-design convention, just above the default 80 cm crouched capsule.",
+          "values": [
+            { "label": "Typical height", "cm": 100 }
+          ],
+          "tip": "About 100 uu hides a default crouch and still lets the pose read as cover, not a full wall."
+        },
+        {
+          "id": "half-cover",
+          "title": "Half cover / fire-over",
+          "kind": "convention",
+          "kindNote": "Level-design convention for waist-to-chest cover you can shoot over.",
+          "values": [
+            { "label": "Low", "cm": 100 },
+            { "label": "High", "cm": 110 }
+          ],
+          "tip": "100–110 uu is a common fire-over height for crates, low walls, and windowsills in an FPS."
+        },
+        {
+          "id": "full-cover",
+          "title": "Standing / full cover",
+          "kind": "convention",
+          "kindNote": "Level-design convention. Default standing capsule is 176 cm; Manny is treated as 180 cm.",
+          "values": [
+            { "label": "Low full cover", "cm": 180 },
+            { "label": "Safe full cover", "cm": 200 }
+          ],
+          "tip": "180 uu hides Manny tightly. 200 uu is safer once you add hats, gun raise, or a slightly taller hero capsule."
+        },
+        {
+          "id": "max-step-cover",
+          "title": "Default max step height",
+          "kind": "engine",
+          "kindNote": "UCharacterMovementComponent MaxStepHeight is 45 uu in UE 5.6.",
+          "values": [
+            { "label": "Step-up", "cm": 45 }
+          ],
+          "tip": "The default character walks onto ledges up to 45 uu. Anything taller needs a jump, vault, or a lower lip."
+        }
+      ]
+    },
+    {
+      "id": "counters",
+      "title": "Counters and tables",
+      "summary": "Kitchens, desks, tables, and bars",
+      "entries": [
+        {
+          "id": "kitchen-counter",
+          "title": "Kitchen counter",
+          "kind": "standard",
+          "kindNote": "Standard US kitchen counter height is 36 in.",
+          "values": [
+            { "label": "Height", "cm": 91.44 }
+          ],
+          "tip": "A good worktop and a high half-cover line. In first person it sits just under a comfortable fire-over."
+        },
+        {
+          "id": "dining-table",
+          "title": "Dining table",
+          "kind": "typical",
+          "kindNote": "Most dining tables are 28–30 in. 30 in is the usual setting.",
+          "values": [
+            { "label": "Height", "cm": 76.2 }
+          ],
+          "tip": "Use 30 in for kitchen and dining tables. It reads as furniture, not cover, unless you flip it."
+        },
+        {
+          "id": "desk",
+          "title": "Desk",
+          "kind": "typical",
+          "kindNote": "Common desk height is 29–30 in. 29 in is a frequent office setting.",
+          "values": [
+            { "label": "Height", "cm": 73.66 }
+          ],
+          "tip": "Keep office desks near 29 in so chairs and monitors still fit a 176–180 cm character."
+        },
+        {
+          "id": "bar-counter",
+          "title": "Bar counter",
+          "kind": "standard",
+          "kindNote": "Standard US bar height is 42 in.",
+          "values": [
+            { "label": "Height", "cm": 106.68 }
+          ],
+          "tip": "42 in is a standing drink rail and a solid fire-over. It is just above typical half cover."
+        },
+        {
+          "id": "bathroom-vanity",
+          "title": "Bathroom vanity",
+          "kind": "typical",
+          "kindNote": "Traditional US vanities are often 32 in. Comfort-height vanities are 34–36 in.",
+          "values": [
+            { "label": "Traditional", "cm": 81.28 },
+            { "label": "Comfort height", "cm": 91.44 }
+          ],
+          "tip": "Use 32 in for older baths and 36 in if the vanity should line up with a kitchen counter."
+        }
+      ]
+    },
+    {
+      "id": "vehicles",
+      "title": "Vehicles",
+      "summary": "Typical vehicle and parking sizes",
+      "entries": [
+        {
+          "id": "midsize-sedan",
+          "title": "Typical midsize sedan",
+          "kind": "typical",
+          "kindNote": "Approximate current midsize sedan range, not one model.",
+          "values": [
+            { "label": "Length", "text": "4.6–4.9 m  ·  15–16 ft  ·  460–490 uu" },
+            { "label": "Width (body)", "text": "about 1.8 m  ·  180 uu" },
+            { "label": "Height", "text": "1.4–1.5 m  ·  140–150 uu" }
+          ],
+          "tip": "Leave extra width for mirrors (often near 2.0 m overall) and a little length if the car must turn in an alley."
+        },
+        {
+          "id": "midsize-suv",
+          "title": "Typical midsize SUV",
+          "kind": "typical",
+          "kindNote": "Approximate current midsize SUV range, not one model.",
+          "values": [
+            { "label": "Length", "text": "4.8–5.1 m  ·  16–17 ft  ·  480–510 uu" },
+            { "label": "Width (body)", "text": "about 1.9 m  ·  190 uu" },
+            { "label": "Height", "text": "1.7–1.8 m  ·  170–180 uu" }
+          ],
+          "tip": "SUV height is close to Manny's eye line. A standing character barely sees over the roof."
+        },
+        {
+          "id": "full-size-pickup",
+          "title": "Typical full-size pickup",
+          "kind": "typical",
+          "kindNote": "Crew-cab full-size trucks vary a lot with bed length. These figures are a typical range.",
+          "values": [
+            { "label": "Length", "text": "5.8–6.3 m  ·  19–21 ft  ·  580–630 uu" },
+            { "label": "Width", "text": "about 2.0 m  ·  200 uu" },
+            { "label": "Height", "text": "1.9–2.0 m  ·  190–200 uu" }
+          ],
+          "tip": "Plan gates and parking for the long end of this range. The cab roof is full standing cover."
+        },
+        {
+          "id": "parking-stall",
+          "title": "US parking stall",
+          "kind": "convention",
+          "kindNote": "9 × 18 ft is a common US planning stall. Some lots use 8.5 × 18 ft.",
+          "values": [
+            { "label": "Width", "cm": 274.32 },
+            { "label": "Length", "cm": 548.64 }
+          ],
+          "tip": "A reliable stall for base courtyards and lots. Tighten only if you want a cramped, urban feel."
+        },
+        {
+          "id": "highway-lane",
+          "title": "US highway lane",
+          "kind": "standard",
+          "kindNote": "12 ft is the common US highway lane width (AASHTO). Urban lanes are often 10–11 ft.",
+          "values": [
+            { "label": "Highway", "cm": 365.76 },
+            { "label": "Urban (typical)", "text": "10–11 ft  ·  305–335 uu" }
+          ],
+          "tip": "Use 12 ft for roads that should feel like a highway. 10 ft is tighter and reads as a city street."
+        }
+      ]
+    },
+    {
+      "id": "fences",
+      "title": "Fences and walls",
+      "summary": "Fence, guard, and wall thicknesses",
+      "entries": [
+        {
+          "id": "privacy-fence-6ft",
+          "title": "Residential privacy fence",
+          "kind": "typical",
+          "kindNote": "6 ft is the common US backyard privacy fence height.",
+          "values": [
+            { "label": "Height", "cm": 182.88 }
+          ],
+          "tip": "Just taller than Manny, so it works as standing cover. A 6 ft fence with no gap will fully hide a default capsule."
+        },
+        {
+          "id": "picket-fence-4ft",
+          "title": "Picket or yard fence",
+          "kind": "typical",
+          "kindNote": "Decorative and front-yard fences are commonly about 4 ft.",
+          "values": [
+            { "label": "Height", "cm": 121.92 }
+          ],
+          "tip": "4 ft is high half-cover: you can see over it standing, and it hides a crouch if the boards are solid."
+        },
+        {
+          "id": "guard-residential",
+          "title": "Residential guard height",
+          "kind": "code",
+          "kindNote": "US IRC residential guards are typically 36 in minimum on open sides more than 30 in above the floor.",
+          "values": [
+            { "label": "Height", "cm": 91.44 }
+          ],
+          "tip": "Use 36 in on house stairs, landings, and decks. It lines up with a kitchen counter."
+        },
+        {
+          "id": "guard-commercial",
+          "title": "Commercial guard height",
+          "kind": "code",
+          "kindNote": "US commercial / IBC guards are typically 42 in minimum.",
+          "values": [
+            { "label": "Height", "cm": 106.68 }
+          ],
+          "tip": "Use 42 in on public stairs, balconies, and catwalks. It matches a bar-counter fire-over line."
+        },
+        {
+          "id": "wall-thickness",
+          "title": "Interior wall thickness",
+          "kind": "standard",
+          "kindNote": "US wood-stud walls with 1/2 in drywall on both sides: 2×4 is 4.5 in, 2×6 is 6.5 in.",
+          "values": [
+            { "label": "2×4 wall", "cm": 11.43 },
+            { "label": "2×6 wall", "cm": 16.51 }
+          ],
+          "tip": "Keep ordinary interior walls near 4.5 in. Thicker 2×6 walls suit exteriors or services. Exaggerated walls are fine if they need to read as cover."
+        }
+      ]
+    },
+    {
+      "id": "characters",
+      "title": "Characters",
+      "summary": "Manny, capsule, and movement defaults",
+      "entries": [
+        {
+          "id": "default-capsule",
+          "title": "Default character capsule",
+          "kind": "engine",
+          "kindNote": "ACharacter default in UE 5.6: capsule half-height 88, radius 34. Same values as earlier UE5 releases.",
+          "values": [
+            { "label": "Half-height", "cm": 88 },
+            { "label": "Radius", "cm": 34 },
+            { "label": "Standing height", "cm": 176 },
+            { "label": "Width", "cm": 68 }
+          ],
+          "tip": "The official pawn size is 176 cm tall and 68 cm wide. Build doorways and cover against this capsule, not just the mesh."
+        },
+        {
+          "id": "manny-height",
+          "title": "UE5 Manny height",
+          "kind": "typical",
+          "kindNote": "Manny is built for the 176 cm default capsule. This app treats standing height as 180 cm (about 5 ft 11 in). Exact mesh height varies slightly with pose and hair.",
+          "values": [
+            { "label": "Reference height", "cm": 180 },
+            { "label": "Default capsule", "cm": 176 }
+          ],
+          "tip": "The converter's “percent of Manny” uses 180 cm. If your hero uses a custom capsule, measure against that instead."
+        },
+        {
+          "id": "eye-height",
+          "title": "Default eye height",
+          "kind": "engine",
+          "kindNote": "APawn BaseEyeHeight is 64 uu above the capsule center. With a 88 uu half-height, the camera sits 152 cm off the ground.",
+          "values": [
+            { "label": "From ground", "cm": 152 },
+            { "label": "BaseEyeHeight", "cm": 64 }
+          ],
+          "tip": "152 uu is the default first-person or follow-camera eye line. Window sills and cover should be judged from here, not from the top of the head."
+        },
+        {
+          "id": "crouch-character",
+          "title": "Default crouch pose",
+          "kind": "engine",
+          "kindNote": "CrouchedHalfHeight is 40 uu. CrouchedEyeHeight is 32 uu above the crouched capsule center, so the eye line is 72 cm off the ground.",
+          "values": [
+            { "label": "Crouched height", "cm": 80 },
+            { "label": "Crouched eye line", "cm": 72 }
+          ],
+          "tip": "Default crouch is very low. If a 72 uu eye line feels too sunk, raise CrouchedHalfHeight and the cover heights together."
+        },
+        {
+          "id": "max-step-height",
+          "title": "Default max step height",
+          "kind": "engine",
+          "kindNote": "UCharacterMovementComponent MaxStepHeight is 45 uu in UE 5.6.",
+          "values": [
+            { "label": "Step-up", "cm": 45 }
+          ],
+          "tip": "Kerbs, stairs, and rubble under 45 uu can be walked. Taller lips need a ramp, a jump, or a vault ability."
+        },
+        {
+          "id": "walkable-slope",
+          "title": "Default max walkable slope",
+          "kind": "engine",
+          "kindNote": "WalkableFloorAngle defaults to 44.773°. That is acos(0.71), the default WalkableFloorZ.",
+          "values": [
+            { "label": "Angle", "text": "44.77°" },
+            { "label": "WalkableFloorZ", "text": "0.71" }
+          ],
+          "tip": "Ramps at or above 44.77° are not walkable with default movement. Keep combat ramps clearly under this, around 30° or less if they should feel comfortable."
+        },
+        {
+          "id": "default-jump",
+          "title": "Default jump height",
+          "kind": "engine",
+          "kindNote": "Derived from default JumpZVelocity 420 and gravity 980: height = 420² / (2 × 980) = 90 cm.",
+          "values": [
+            { "label": "Apex", "cm": 90 },
+            { "label": "JumpZVelocity", "text": "420 uu/s" }
+          ],
+          "tip": "A default jump clears 90 uu. Combined with the 45 uu step, a character can mount ledges a little over 90 uu if the lip is forgiving."
+        },
+        {
+          "id": "max-walk-speed",
+          "title": "Default max walk speed",
+          "kind": "engine",
+          "kindNote": "MaxWalkSpeed defaults to 600 uu/s (6 m/s). That is a run, not a casual walk. MaxWalkSpeedCrouched defaults to 300 uu/s.",
+          "values": [
+            { "label": "Walk / run", "text": "600 uu/s  ·  6 m/s" },
+            { "label": "Crouched", "text": "300 uu/s  ·  3 m/s" }
+          ],
+          "tip": "At 6 m/s, openings and stairs need more clearance than real life. This is one reason FPS doors are often scaled 1.2–1.5×."
+        }
+      ]
+    }
+  ]
+}
