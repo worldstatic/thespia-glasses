@@ -71,6 +71,197 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("favorites key missing from app.js")
 
 
+def extract_js_function(js: str, name: str) -> str:
+    token = f"  function {name}("
+    start = js.find(token)
+    if start < 0:
+        raise ValueError(f"function {name} not found")
+    # Capture through the next top-level function or the end of the useful slice.
+    nxt = js.find("\n  function ", start + len(token))
+    const_after = js.find("\n  const ", start + len(token))
+    end_candidates = [i for i in (nxt, const_after) if i > start]
+    end = min(end_candidates) if end_candidates else start + len(token)
+    return js[start:end].rstrip() + "\n"
+
+
+def extract_js_block(js: str, start_token: str, end_token: str) -> str:
+    start = js.find(start_token)
+    end = js.find(end_token, start + len(start_token) if start >= 0 else 0)
+    if start < 0 or end < 0:
+        raise ValueError(f"block {start_token!r} .. {end_token!r} not found")
+    return js[start:end]
+
+
+def check_custom_recipes(js: str, css: str, failures: list[str]) -> None:
+    for needle in (
+        "New recipe",
+        "open-new-recipe",
+        "Add step",
+        "recipe-title",
+        "recipe-title-continue",
+        "step-title",
+        "step-body",
+        "add-step",
+        "finish-recipe",
+        "edit-recipe",
+        "delete-recipe",
+        "confirm-delete-recipe",
+        "open-recipe-backup",
+        "recipe-backup-blob",
+        "import-recipes",
+        "Export / Import",
+        "function upsertCustomRecipe(",
+        "function deleteCustomRecipe(",
+        "function listCustomRecipes(",
+        "function exportCustomRecipesBlob(",
+        "function importCustomRecipesBlob(",
+        "function searchLibrary(",
+        "listCustomRecipes()",
+        "thespia.hud.favorites",
+        'type: "search"',
+        'type: "text"',
+        'screen: "recipe-editor"',
+        "localStorage",
+    ):
+        if needle not in js:
+            failures.append(f"app.js missing custom recipe support: {needle}")
+
+    # Title and step fields must be search/text so on-glasses dictation can open.
+    if 'id: "recipe-title"' not in js or 'id: "step-title"' not in js or 'id: "step-body"' not in js:
+        failures.append("recipe editor is missing title or step field ids")
+    for field_id in ("recipe-title", "step-title"):
+        idx = js.find(f'id: "{field_id}"')
+        if idx < 0:
+            continue
+        window = js[idx: idx + 280]
+        if 'type: "search"' not in window and 'type: "text"' not in window:
+            failures.append(f"{field_id} must use type=search or type=text")
+    body_idx = js.find('id: "step-body"')
+    if body_idx >= 0:
+        window = js[body_idx: body_idx + 280]
+        if 'type: "search"' not in window and 'type: "text"' not in window:
+            failures.append("step-body must use type=search or type=text")
+
+    if "searchLibrary" in js:
+        start = js.find("function searchLibrary")
+        block = js[start: start + 500]
+        if "listCustomRecipes()" not in block:
+            failures.append("searchLibrary must include custom recipes from localStorage")
+
+    if "textarea" not in css or "field-area" not in css:
+        failures.append("styles.css missing textarea/backup field styles")
+
+    run_custom_recipe_logic_tests(js, failures)
+
+
+def run_custom_recipe_logic_tests(js: str, failures: list[str]) -> None:
+    """Run create/edit/delete/search against the shipped helper functions in Node."""
+    try:
+        helpers = extract_js_block(js, "  const RECIPE_TITLE_MAX", "  function blankEditorState")
+        load_favs = extract_js_function(js, "loadFavorites")
+        save_favs = extract_js_function(js, "saveFavorites")
+        normalize = extract_js_function(js, "normalize")
+        score = extract_js_function(js, "scoreRecipe")
+        search = extract_js_function(js, "searchLibrary")
+    except ValueError as err:
+        failures.append(f"could not extract custom recipe helpers: {err}")
+        return
+
+    harness = f"""
+const store = {{}};
+const localStorage = {{
+  getItem(key) {{ return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; }},
+  setItem(key, value) {{ store[key] = String(value); }},
+  removeItem(key) {{ delete store[key]; }},
+}};
+const console = {{ warn() {{}} }};
+function pass() {{ process.stdout.write("custom-recipe-logic-ok" + String.fromCharCode(10)); }}
+const FAVORITES_KEY = "thespia.hud.favorites";
+let library = {{
+  recipes: [
+    {{
+      id: "line-trace",
+      title: "Line Trace",
+      summary: "Fire a line trace",
+      tags: ["trace"],
+      nodes: ["LineTraceByChannel"],
+      steps: [{{ title: "Add node", body: "Add Line Trace By Channel" }}],
+    }},
+  ],
+}};
+{load_favs}
+{save_favs}
+{helpers}
+{normalize}
+{score}
+{search}
+
+const created = upsertCustomRecipe({{
+  id: "user-test-1",
+  title: "My rust door",
+  summary: "Your recipe",
+  steps: [{{ title: "Open the event", body: "Use Event Begin Play" }}],
+  source: "custom",
+  origin: "user",
+}});
+if (!created.ok || created.recipe.title !== "My rust door") throw new Error("create failed");
+
+const updated = upsertCustomRecipe({{
+  ...created.recipe,
+  title: "My rust door v2",
+  steps: [
+    {{ title: "Open the event", body: "Use Event Begin Play" }},
+    {{ title: "Set lock", body: "Set a Boolean named Locked" }},
+  ],
+}});
+if (!updated.ok || updated.recipe.title !== "My rust door v2" || updated.recipe.steps.length !== 2) {{
+  throw new Error("edit failed");
+}}
+if (listCustomRecipes().length !== 1) throw new Error("edit should update in place");
+
+const hits = searchLibrary("rust door");
+if (!hits.some((row) => row.recipe.id === "user-test-1")) throw new Error("search missed custom recipe");
+const lockHits = searchLibrary("Boolean named Locked");
+if (!lockHits.some((row) => row.recipe.id === "user-test-1")) throw new Error("search missed custom step text");
+const libHits = searchLibrary("line trace");
+if (!libHits.some((row) => row.recipe.id === "line-trace")) throw new Error("search missed library recipe");
+
+const blob = exportCustomRecipesBlob();
+const parsed = JSON.parse(blob);
+if (parsed.version !== 1 || parsed.recipes[0].title !== "My rust door v2") throw new Error("export blob invalid");
+
+if (!deleteCustomRecipe("user-test-1")) throw new Error("delete failed");
+if (listCustomRecipes().length !== 0) throw new Error("delete did not remove recipe");
+if (searchLibrary("rust door").some((row) => row.recipe.id === "user-test-1")) throw new Error("search still shows deleted recipe");
+
+const imported = importCustomRecipesBlob(blob);
+if (!imported.ok || imported.imported !== 1) throw new Error("import failed");
+if (!getCustomRecipe("user-test-1") || getCustomRecipe("user-test-1").title !== "My rust door v2") {{
+  throw new Error("import did not restore recipe");
+}}
+
+pass();
+"""
+    import subprocess
+    import tempfile
+    from pathlib import Path as _Path
+
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as handle:
+        handle.write(harness)
+        temp_name = handle.name
+    try:
+        result = subprocess.run(["node", temp_name], capture_output=True, text=True)
+    except FileNotFoundError:
+        failures.append("node is required to run custom recipe create/edit/delete/search tests")
+        return
+    finally:
+        _Path(temp_name).unlink(missing_ok=True)
+
+    if result.returncode != 0 or "custom-recipe-logic-ok" not in (result.stdout or ""):
+        detail = (result.stderr or result.stdout or "no output").strip()
+        failures.append(f"custom recipe logic tests failed: {detail}")
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -126,6 +317,7 @@ def main() -> int:
         failures.append("service worker missing transport file or cache prefix")
 
     check_home_and_major(js, css, html, transport, failures)
+    check_custom_recipes(js, css, failures)
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],

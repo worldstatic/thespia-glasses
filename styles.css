@@ -184,6 +184,7 @@ button.tile,
 
 button,
 input,
+textarea,
 a.tile {
   font: inherit;
   color: inherit;
@@ -244,7 +245,7 @@ button.ghost {
   outline-offset: 4px;
 }
 
-:where(button, a, input):focus {
+:where(button, a, input, textarea):focus {
   outline: 3px solid #fff;
   outline-offset: 4px;
 }
@@ -261,7 +262,9 @@ label {
 }
 
 input[type="search"],
-input[type="text"] {
+input[type="text"],
+textarea.field-area,
+textarea {
   inline-size: 100%;
   min-block-size: 3rem;
   padding: 0.7rem 0.8rem;
@@ -269,6 +272,14 @@ input[type="text"] {
   border: 1px solid #5a5a5a;
   border-radius: 0.6rem;
   color: #fff;
+}
+
+textarea.field-area,
+textarea {
+  min-block-size: 7rem;
+  max-block-size: 12rem;
+  resize: vertical;
+  line-height: 1.35;
 }
 
 input::placeholder {

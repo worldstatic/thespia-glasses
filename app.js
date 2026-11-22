@@ -133,6 +133,158 @@
     }
   }
 
+  const RECIPE_TITLE_MAX = 80;
+  const STEP_TITLE_MAX = 80;
+  const STEP_BODY_MAX = 400;
+  const MAX_CUSTOM_RECIPES = 50;
+  const MAX_CUSTOM_STEPS = 20;
+  let customIdSeq = 0;
+
+  function newCustomId() {
+    customIdSeq += 1;
+    return `user-${Date.now()}-${customIdSeq}`;
+  }
+
+  function normalizeStep(step) {
+    if (!step) return null;
+    const title = String(step.title || "").trim().slice(0, STEP_TITLE_MAX);
+    const body = String(step.body || "").trim().slice(0, STEP_BODY_MAX);
+    if (!title && !body) return null;
+    return { title: title || "Step", body };
+  }
+
+  function normalizeCustomRecipe(item) {
+    if (!item || typeof item !== "object") return null;
+    const title = String(item.title || "").trim().slice(0, RECIPE_TITLE_MAX);
+    if (!title) return null;
+    const steps = (Array.isArray(item.steps) ? item.steps : []).map(normalizeStep).filter(Boolean);
+    if (!steps.length) return null;
+    const rawId = String(item.id || "").trim();
+    const id = rawId || newCustomId();
+    const origin = item.origin === "ai" || id.startsWith("ai-") ? "ai" : "user";
+    return {
+      id,
+      title,
+      summary: String(item.summary || "Your recipe").trim().slice(0, 160) || "Your recipe",
+      steps,
+      source: "custom",
+      origin,
+      nodes: Array.isArray(item.nodes)
+        ? item.nodes.map((node) => String(node).trim().slice(0, 80)).filter(Boolean).slice(0, 12)
+        : [],
+    };
+  }
+
+  function listCustomRecipes() {
+    return loadFavorites().custom.map(normalizeCustomRecipe).filter(Boolean);
+  }
+
+  function getCustomRecipe(id) {
+    return listCustomRecipes().find((recipe) => recipe.id === id) || null;
+  }
+
+  function customLabel(recipe) {
+    if (!recipe) return "Your recipe";
+    if (recipe.origin === "ai" || String(recipe.id || "").startsWith("ai-")) return "Saved answer";
+    return "Your recipe";
+  }
+
+  function upsertCustomRecipe(recipe) {
+    const normalized = normalizeCustomRecipe(recipe);
+    if (!normalized) return { ok: false, reason: "invalid", recipe: null };
+    const favs = loadFavorites();
+    const index = favs.custom.findIndex((item) => item && item.id === normalized.id);
+    if (index >= 0) {
+      favs.custom[index] = normalized;
+    } else {
+      if (favs.custom.length >= MAX_CUSTOM_RECIPES) return { ok: false, reason: "full", recipe: null };
+      favs.custom.unshift(normalized);
+    }
+    const ok = saveFavorites(favs);
+    return { ok, reason: ok ? "" : "storage", recipe: normalized };
+  }
+
+  function deleteCustomRecipe(id) {
+    const favs = loadFavorites();
+    const next = favs.custom.filter((item) => !(item && item.id === id));
+    if (next.length === favs.custom.length) return false;
+    favs.custom = next;
+    return saveFavorites(favs);
+  }
+
+  function exportCustomRecipesBlob() {
+    return JSON.stringify({ version: 1, recipes: listCustomRecipes() }, null, 2);
+  }
+
+  function importCustomRecipesBlob(text) {
+    let data;
+    try {
+      data = JSON.parse(String(text || "").trim());
+    } catch (_err) {
+      return { ok: false, imported: 0, message: "That backup is not valid JSON." };
+    }
+    const list = Array.isArray(data)
+      ? data
+      : data && Array.isArray(data.recipes)
+        ? data.recipes
+        : null;
+    if (!list) return { ok: false, imported: 0, message: "No recipes found in that backup." };
+    const favs = loadFavorites();
+    let imported = 0;
+    for (const item of list) {
+      const normalized = normalizeCustomRecipe(item);
+      if (!normalized) continue;
+      const index = favs.custom.findIndex((row) => row && row.id === normalized.id);
+      if (index >= 0) favs.custom[index] = normalized;
+      else {
+        if (favs.custom.length >= MAX_CUSTOM_RECIPES) break;
+        favs.custom.unshift(normalized);
+      }
+      imported += 1;
+    }
+    if (!imported) return { ok: false, imported: 0, message: "No usable recipes in that backup." };
+    const ok = saveFavorites(favs);
+    return {
+      ok,
+      imported,
+      message: ok
+        ? `Imported ${imported} recipe${imported === 1 ? "" : "s"}.`
+        : "Could not save on this device.",
+    };
+  }
+
+  function blankEditorState(overrides) {
+    return {
+      screen: "recipe-editor",
+      phase: "title",
+      editId: null,
+      title: "",
+      steps: [],
+      editingStep: null,
+      notice: "",
+      noticeKind: "",
+      ...overrides,
+    };
+  }
+
+  function openNewRecipe() {
+    navigate(blankEditorState());
+  }
+
+  function openEditRecipe(recipe) {
+    const stored = recipe && recipe.id ? getCustomRecipe(recipe.id) : null;
+    const source = stored || recipe || {};
+    const steps = (source.steps || []).map(normalizeStep).filter(Boolean);
+    navigate(
+      blankEditorState({
+        editId: source.id || null,
+        title: source.title || "",
+        steps,
+        phase: "title",
+      })
+    );
+  }
+
   function loadNextUp() {
     try {
       const raw = localStorage.getItem(NEXT_UP_KEY);
@@ -184,6 +336,8 @@
           summary: recipe.summary || "",
           steps: recipe.steps,
           source: "custom",
+          origin: recipe.origin || (String(recipe.id || "").startsWith("ai-") ? "ai" : "user"),
+          nodes: recipe.nodes || [],
         });
       }
     } else if (favs.libraryIds.includes(recipe.id)) {
@@ -218,10 +372,14 @@
     for (const node of nodes) {
       if (q.includes(node) || node.includes(q)) score += 6;
     }
+    const stepText = normalize(
+      (recipe.steps || []).map((step) => `${step.title || ""} ${step.body || ""}`).join(" ")
+    );
     for (const word of q.split(" ")) {
       if (word.length < 3) continue;
       if (title.includes(word)) score += 3;
       if (summary.includes(word)) score += 1;
+      if (stepText.includes(word)) score += 1;
       if (tags.some((tag) => tag.includes(word) || word.includes(tag))) score += 2;
       if (nodes.some((node) => node.includes(word) || word.includes(node))) score += 2;
     }
@@ -229,8 +387,9 @@
   }
 
   function searchLibrary(query) {
-    if (!library) return [];
-    return library.recipes
+    const builtIn = library && Array.isArray(library.recipes) ? library.recipes : [];
+    const pool = [...listCustomRecipes(), ...builtIn];
+    return pool
       .map((recipe) => ({ recipe, score: scoreRecipe(recipe, query) }))
       .filter((row) => row.score > 0)
       .sort((a, b) => b.score - a.score);
@@ -762,6 +921,22 @@
           {
             type: "button",
             className: "tile",
+            id: "open-new-recipe",
+            onClick: openNewRecipe,
+          },
+          [
+            el("span", { className: "tile-title", text: "New recipe" }),
+            el("span", {
+              className: "tile-sub",
+              text: "Write your own steps, saved on this device",
+            }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
             onClick: () => navigate({ screen: "library" }),
           },
           [
@@ -782,6 +957,22 @@
           [
             el("span", { className: "tile-title", text: "Favorites" }),
             el("span", { className: "tile-sub", text: favCount ? `${favCount} saved` : "None saved yet" }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-recipe-backup",
+            onClick: () => navigate({ screen: "recipe-backup" }),
+          },
+          [
+            el("span", { className: "tile-title", text: "Export / Import" }),
+            el("span", {
+              className: "tile-sub",
+              text: "Back up your recipes as a JSON text blob",
+            }),
           ]
         ),
       ]),
@@ -826,7 +1017,14 @@
         el(
           "ul",
           { className: "list" },
-          results.map((row) => el("li", null, [recipeButton(row.recipe)]))
+          results.map((row) =>
+            el("li", null, [
+              recipeButton(
+                row.recipe,
+                row.recipe && row.recipe.source === "custom" ? customLabel(row.recipe) : null
+              ),
+            ])
+          )
         )
       );
     }
@@ -864,7 +1062,10 @@
     const { fromLibrary, custom } = allFavoriteRecipes();
     const items = [
       ...fromLibrary.map((recipe) => ({ recipe, label: "Library" })),
-      ...custom.map((recipe) => ({ recipe: { ...recipe, source: "custom" }, label: "Saved answer" })),
+      ...custom.map((recipe) => ({
+        recipe: { ...recipe, source: "custom" },
+        label: customLabel(recipe),
+      })),
     ];
     const body = items.length
       ? el(
@@ -874,25 +1075,38 @@
         )
       : el("p", {
           className: "muted",
-          text: "Nothing saved yet. Open a recipe and choose Save to keep it here.",
+          text: "Nothing saved yet. Add a new recipe, or open a library recipe and choose Save.",
         });
     return screen([
       header("Blueprint Help", "Favorites", "Saved on this device"),
       el("div", { className: "content" }, [body]),
-      el("div", { className: "footer" }, [homeButton()]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "open-recipe-backup-fav",
+            onClick: () => navigate({ screen: "recipe-backup" }),
+          },
+          "Export / Import"
+        ),
+        homeButton(),
+      ]),
     ]);
   }
 
-  function openRecipe(recipe, step = 0) {
+  function openRecipe(recipe, step = 0, { push = true } = {}) {
     const payload = {
       id: recipe.id,
       title: recipe.title,
       summary: recipe.summary || "",
       steps: recipe.steps,
       source: recipe.source || "library",
+      origin: recipe.origin || "",
       nodes: recipe.nodes || [],
     };
-    navigate({ screen: "recipe", recipe: payload, step });
+    navigate({ screen: "recipe", recipe: payload, step }, { push });
   }
 
   function updateStep(state, step, { speakStep = false } = {}) {
@@ -924,6 +1138,7 @@
     const index = Math.max(0, Math.min(steps.length - 1, state.step || 0));
     const step = steps[index] || { title: "No steps", body: "This recipe has no steps." };
     const saved = isFavorite(recipe);
+    const storedCustom = recipe.source === "custom" && Boolean(recipe.id && getCustomRecipe(recipe.id));
     const last = index >= steps.length - 1;
 
     const panel = el("article", {
@@ -945,18 +1160,41 @@
         header("Blueprint Help", recipe.title, "Swipe left or right to change steps"),
         el("div", { className: "content" }, [panel]),
         el("div", { className: "footer" }, [
-          el(
-            "button",
-            {
-              type: "button",
-              className: "secondary",
-              onClick: () => {
-                toggleFavorite(recipe);
-                updateStep(currentState(), currentState().step || 0);
-              },
-            },
-            saved ? "Saved" : "Save"
-          ),
+          storedCustom
+            ? el(
+                "button",
+                {
+                  type: "button",
+                  className: "secondary",
+                  id: "edit-recipe",
+                  onClick: () => openEditRecipe(recipe),
+                },
+                "Edit"
+              )
+            : el(
+                "button",
+                {
+                  type: "button",
+                  className: "secondary",
+                  onClick: () => {
+                    toggleFavorite(recipe);
+                    updateStep(currentState(), currentState().step || 0);
+                  },
+                },
+                saved ? "Saved" : "Save"
+              ),
+          storedCustom
+            ? el(
+                "button",
+                {
+                  type: "button",
+                  className: "secondary",
+                  id: "delete-recipe",
+                  onClick: () => navigate({ screen: "recipe-delete", recipe }),
+                },
+                "Delete"
+              )
+            : null,
           canSpeak()
             ? el(
                 "button",
@@ -970,6 +1208,433 @@
         ]),
       ],
       "recipe-screen"
+    );
+  }
+
+  function readEditorDrafts(state) {
+    const titleInput = document.getElementById("recipe-title");
+    const stepTitleInput = document.getElementById("step-title");
+    const stepBodyInput = document.getElementById("step-body");
+    const next = { ...state };
+    if (titleInput) next.title = titleInput.value.trim().slice(0, RECIPE_TITLE_MAX);
+    if (stepTitleInput || stepBodyInput) {
+      next.draftTitle = stepTitleInput ? stepTitleInput.value : "";
+      next.draftBody = stepBodyInput ? stepBodyInput.value : "";
+    }
+    return next;
+  }
+
+  function continueFromTitle() {
+    const state = readEditorDrafts(currentState());
+    const title = String(state.title || "").trim();
+    if (!title) {
+      navigate(
+        { ...state, phase: "title", notice: "Add a title first.", noticeKind: "error" },
+        { push: false }
+      );
+      return;
+    }
+    navigate(
+      { ...state, title, phase: "steps", notice: "", noticeKind: "" },
+      { push: false }
+    );
+  }
+
+  function addStepFromForm({ andDone = false } = {}) {
+    const state = readEditorDrafts(currentState());
+    const draft = normalizeStep({ title: state.draftTitle, body: state.draftBody });
+    let steps = Array.isArray(state.steps) ? state.steps.slice() : [];
+    let notice = "";
+    let noticeKind = "";
+
+    if (state.editingStep != null && state.editingStep >= 0 && state.editingStep < steps.length) {
+      if (!draft) {
+        navigate(
+          { ...state, notice: "Write a step title or body first.", noticeKind: "error" },
+          { push: false }
+        );
+        return false;
+      }
+      steps[state.editingStep] = draft;
+      notice = "Step updated.";
+      noticeKind = "ok";
+    } else if (draft) {
+      if (steps.length >= MAX_CUSTOM_STEPS) {
+        navigate(
+          {
+            ...state,
+            notice: "This recipe already has the maximum number of steps.",
+            noticeKind: "error",
+          },
+          { push: false }
+        );
+        return false;
+      }
+      steps.push(draft);
+      notice = "Step added.";
+      noticeKind = "ok";
+    } else if (!andDone) {
+      navigate(
+        { ...state, notice: "Write a step title or body first.", noticeKind: "error" },
+        { push: false }
+      );
+      return false;
+    }
+
+    const next = {
+      ...state,
+      steps,
+      editingStep: null,
+      draftTitle: "",
+      draftBody: "",
+      notice,
+      noticeKind,
+    };
+    if (andDone) return finishRecipe(next);
+    navigate(next, { push: false });
+    return true;
+  }
+
+  function removeEditingStep() {
+    const state = readEditorDrafts(currentState());
+    if (state.editingStep == null) return;
+    const steps = (state.steps || []).slice();
+    if (state.editingStep < 0 || state.editingStep >= steps.length) return;
+    steps.splice(state.editingStep, 1);
+    navigate(
+      {
+        ...state,
+        steps,
+        editingStep: null,
+        draftTitle: "",
+        draftBody: "",
+        notice: "Step removed.",
+        noticeKind: "ok",
+      },
+      { push: false }
+    );
+  }
+
+  function startEditStep(index) {
+    const state = readEditorDrafts(currentState());
+    const step = (state.steps || [])[index];
+    if (!step) return;
+    navigate(
+      {
+        ...state,
+        phase: "steps",
+        editingStep: index,
+        draftTitle: step.title || "",
+        draftBody: step.body || "",
+        notice: `Editing step ${index + 1}.`,
+        noticeKind: "",
+      },
+      { push: false }
+    );
+  }
+
+  function finishRecipe(state) {
+    const current = state || readEditorDrafts(currentState());
+    let steps = Array.isArray(current.steps) ? current.steps.slice() : [];
+    const draft = normalizeStep({ title: current.draftTitle, body: current.draftBody });
+    if (draft) {
+      if (current.editingStep != null && current.editingStep >= 0 && current.editingStep < steps.length) {
+        steps[current.editingStep] = draft;
+      } else if (steps.length < MAX_CUSTOM_STEPS) {
+        steps.push(draft);
+      }
+    }
+    const title = String(current.title || "").trim();
+    if (!title) {
+      navigate(
+        { ...current, phase: "title", steps, notice: "Add a title first.", noticeKind: "error" },
+        { push: false }
+      );
+      return false;
+    }
+    if (!steps.length) {
+      navigate(
+        {
+          ...current,
+          phase: "steps",
+          steps,
+          editingStep: null,
+          notice: "Add at least one step before done.",
+          noticeKind: "error",
+        },
+        { push: false }
+      );
+      return false;
+    }
+    const result = upsertCustomRecipe({
+      id: current.editId || newCustomId(),
+      title,
+      summary: "Your recipe",
+      steps,
+      source: "custom",
+      origin: "user",
+    });
+    if (!result.ok) {
+      const message =
+        result.reason === "full"
+          ? "You already have the maximum number of recipes on this device."
+          : "Could not save on this device.";
+      navigate({ ...current, steps, notice: message, noticeKind: "error" }, { push: false });
+      return false;
+    }
+    openRecipe(result.recipe, 0, { push: false });
+    return true;
+  }
+
+  function renderRecipeEditor(state) {
+    const phase = state.phase === "steps" ? "steps" : "title";
+    const isEdit = Boolean(state.editId);
+    const title = state.title || "";
+    const steps = state.steps || [];
+    const notice = state.notice || "";
+    const editing = state.editingStep != null && state.editingStep >= 0;
+
+    if (phase === "title") {
+      return screen([
+        header(
+          "Blueprint Help",
+          isEdit ? "Edit recipe" : "New recipe",
+          "Title first, then steps"
+        ),
+        el("div", { className: "content stack" }, [
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "recipe-title", text: "Recipe title" }),
+            el("input", {
+              id: "recipe-title",
+              type: "search",
+              name: "recipe-title",
+              autocomplete: "off",
+              placeholder: "Write or speak a title",
+              value: title,
+              attrs: { enterkeyhint: "next", maxlength: String(RECIPE_TITLE_MAX), spellcheck: "true" },
+            }),
+            el("p", {
+              className: "hint",
+              text: "On glasses, activate this field to dictate. Your recipe stays in local storage on this device.",
+            }),
+          ]),
+          notice
+            ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } })
+            : null,
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary primary",
+              id: "recipe-title-continue",
+              onClick: continueFromTitle,
+            },
+            "Continue"
+          ),
+          el("button", { type: "button", className: "secondary", onClick: goBack }, "Cancel"),
+        ]),
+      ]);
+    }
+
+    const list =
+      steps.length
+        ? el(
+            "ul",
+            { className: "list" },
+            steps.map((step, index) =>
+              el("li", null, [
+                el(
+                  "button",
+                  {
+                    type: "button",
+                    className: "tile",
+                    onClick: () => startEditStep(index),
+                  },
+                  [
+                    el("span", { className: "tile-title", text: `Step ${index + 1}` }),
+                    el("span", { className: "tile-sub", text: step.title || step.body || "" }),
+                  ]
+                ),
+              ])
+            )
+          )
+        : el("p", { className: "muted", text: "No steps yet. Add them one at a time." });
+
+    return screen([
+      header("Blueprint Help", title || "New recipe", `${steps.length} step${steps.length === 1 ? "" : "s"} so far`),
+      el("div", { className: "content stack" }, [
+        list,
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "step-title", text: editing ? `Edit step ${state.editingStep + 1} title` : "Step title" }),
+          el("input", {
+            id: "step-title",
+            type: "search",
+            name: "step-title",
+            autocomplete: "off",
+            placeholder: "Write or speak a short step title",
+            value: state.draftTitle || "",
+            attrs: { enterkeyhint: "next", maxlength: String(STEP_TITLE_MAX), spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "step-body", text: "What to do" }),
+          el("input", {
+            id: "step-body",
+            type: "text",
+            name: "step-body",
+            autocomplete: "off",
+            placeholder: "Write or speak the step",
+            value: state.draftBody || "",
+            attrs: { enterkeyhint: "done", maxlength: String(STEP_BODY_MAX), spellcheck: "true" },
+          }),
+          el("p", {
+            className: "hint",
+            text: "Activate a field to dictate. Add step, then keep going, or choose Done when you are finished.",
+          }),
+        ]),
+        notice
+          ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } })
+          : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "add-step",
+            onClick: () => addStepFromForm(),
+          },
+          editing ? "Save step" : "Add step"
+        ),
+        editing
+          ? el(
+              "button",
+              { type: "button", className: "secondary", id: "remove-step", onClick: removeEditingStep },
+              "Remove step"
+            )
+          : null,
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "finish-recipe",
+            onClick: () => addStepFromForm({ andDone: true }),
+          },
+          "Done"
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            onClick: () =>
+              navigate(
+                { ...readEditorDrafts(currentState()), phase: "title", notice: "", noticeKind: "" },
+                { push: false }
+              ),
+          },
+          "Back"
+        ),
+      ]),
+    ]);
+  }
+
+  function renderRecipeDelete(state) {
+    const recipe = state.recipe || {};
+    return screen([
+      header("Blueprint Help", "Delete recipe?", "This cannot be undone"),
+      el("div", { className: "content stack" }, [
+        el("article", { className: "card" }, [
+          el("p", {
+            className: "step-body",
+            text: `Remove "${recipe.title || "this recipe"}" from this device?`,
+          }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "confirm-delete-recipe",
+            onClick: () => {
+              deleteCustomRecipe(recipe.id);
+              navigate({ screen: "favorites" }, { push: false });
+            },
+          },
+          "Delete"
+        ),
+        el("button", { type: "button", className: "secondary", onClick: goBack }, "Cancel"),
+      ]),
+    ]);
+  }
+
+  function renderRecipeBackup(state) {
+    const blob = state.blob != null ? state.blob : exportCustomRecipesBlob();
+    const notice = state.notice || "";
+    return screen([
+      header("Blueprint Help", "Export / Import", "Backup stays on this device until you copy it"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "recipe-backup-blob", text: "JSON text blob" }),
+          el("textarea", {
+            id: "recipe-backup-blob",
+            className: "field-area",
+            name: "recipe-backup",
+            value: blob,
+            attrs: { spellcheck: "false", rows: "8", autocomplete: "off" },
+          }),
+          el("p", {
+            className: "hint",
+            text: "Copy this to back up your recipes, or paste a backup and choose Import. Nothing is uploaded.",
+          }),
+        ]),
+        notice
+          ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } })
+          : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "refresh-recipe-backup",
+            onClick: () =>
+              navigate({ screen: "recipe-backup", blob: exportCustomRecipesBlob(), notice: "", noticeKind: "" }, { push: false }),
+          },
+          "Refresh export"
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "import-recipes",
+            onClick: importRecipesFromForm,
+          },
+          "Import"
+        ),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function importRecipesFromForm() {
+    const area = document.getElementById("recipe-backup-blob");
+    const textValue = area && area.value ? area.value : "";
+    const result = importCustomRecipesBlob(textValue);
+    navigate(
+      {
+        screen: "recipe-backup",
+        blob: result.ok ? exportCustomRecipesBlob() : textValue,
+        notice: result.message,
+        noticeKind: result.ok ? "ok" : "error",
+      },
+      { push: false }
     );
   }
 
@@ -998,6 +1663,18 @@
       case "recipe":
         view = renderRecipe(state);
         lastFocusSelector = "#step-panel";
+        break;
+      case "recipe-editor":
+        view = renderRecipeEditor(state);
+        lastFocusSelector = state.phase === "steps" ? "#step-title" : "#recipe-title";
+        break;
+      case "recipe-delete":
+        view = renderRecipeDelete(state);
+        lastFocusSelector = "#confirm-delete-recipe";
+        break;
+      case "recipe-backup":
+        view = renderRecipeBackup(state);
+        lastFocusSelector = "#recipe-backup-blob";
         break;
       case "next-up":
         view = renderNextUp(state);
@@ -1096,6 +1773,7 @@
           body: String(step.body || ""),
         })),
         source: "custom",
+        origin: "ai",
         nodes: Array.isArray(data.nodes) ? data.nodes.map(String) : [],
       };
       if (matches.length) {
@@ -1152,6 +1830,22 @@
     if (event.key === "Enter" && event.target && event.target.id === "next-up-input") {
       event.preventDefault();
       saveNextUpFromForm();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "recipe-title") {
+      event.preventDefault();
+      continueFromTitle();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "step-title") {
+      event.preventDefault();
+      const body = document.getElementById("step-body");
+      if (body && typeof body.focus === "function") body.focus();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "step-body") {
+      event.preventDefault();
+      addStepFromForm();
       return;
     }
     if (isTypingTarget(event.target)) return;

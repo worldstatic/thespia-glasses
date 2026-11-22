@@ -18,7 +18,7 @@ Keyboard stand-ins for the Neural Band / Cap Touch:
 
 - **Left / Right** — previous or next recipe step, or Talk to Major reply card
 - **Up / Down** or **Tab** — move between buttons (and spatial navigation if you start Chrome with `--enable-spatial-navigation`)
-- **Enter** — activate the focused button, or submit the question or message field
+- **Enter** — activate the focused button, or submit the question, message, recipe title, or step field
 
 Optional: the [Meta Ray-Ban Display Simulator](https://wearables.developer.meta.com/docs/develop/webapps/test/) Chrome extension can preview the additive display. It is not a substitute for device testing, and it does not reproduce the composer or the Neural Band exactly.
 
@@ -38,6 +38,12 @@ The app opens to a HUD home screen:
 - A **Next up** line you can set. It is stored in `localStorage` on the glasses (or the preview browser) only
 - A tile grid: **Blueprint Help** and **Talk to Major** work now. **Overlock Walk**, **Photo to Texture**, **Scale Check**, and **3D Scan** are marked Coming soon
 
+## Your own Blueprint recipes
+
+In **Blueprint Help**, choose **New recipe**. Enter a title, then add steps one at a time (the `search` and `text` fields open on-glasses dictation). **Add step** keeps you on the editor; **Done** saves the recipe on this device. You can edit or delete a saved recipe, and your recipes show up in search results and Favorites.
+
+**Export / Import** copies your recipes as a JSON text blob for backup, or pastes a backup back in. Custom recipes stay in `localStorage` only. Do not paste personal or work data into a recipe if you later share a screenshot or backup file.
+
 ## Talk to Major
 
 The chat panel uses a `type=search` field so the on-glasses composer (and dictation) can open, a Send button, short reply cards you page with Left/Right, and optional read-aloud.
@@ -56,7 +62,7 @@ The app must be on a public HTTPS URL (GitHub Pages once enabled). In the Meta A
 
 ## Privacy
 
-This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, Next up, and Talk to Major settings stay in `localStorage` on the device. A live bridge URL or token, if you add one, is entered on the glasses and is never part of this source.
+This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Next up, and Talk to Major settings stay in `localStorage` on the device. A live bridge URL or token, if you add one, is entered on the glasses and is never part of this source.
 
 ## What this app assumes from Meta's docs
 
