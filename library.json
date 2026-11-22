@@ -1,0 +1,506 @@
+{
+  "version": 1,
+  "engine": "Unreal Engine 5.6",
+  "mode": "Blueprints only",
+  "recipes": [
+    {
+      "id": "line-trace",
+      "title": "Line Trace By Channel",
+      "summary": "Cast a line from the camera and read what it hits.",
+      "tags": ["trace", "raycast", "hit", "visibility", "camera", "shoot", "interact", "line"],
+      "nodes": ["Get Player View Point", "Get Forward Vector", "Line Trace By Channel", "Branch", "Break Hit Result"],
+      "steps": [
+        {
+          "title": "Get the camera view",
+          "body": "From a Player Controller, add Get Player View Point. Use its Out Location as the trace Start, and keep Out Rotation for the next step."
+        },
+        {
+          "title": "Choose the end point",
+          "body": "Add Get Forward Vector and plug in the camera rotation. Set End to Start + (Forward Vector × distance), for example 5000 units."
+        },
+        {
+          "title": "Add Line Trace By Channel",
+          "body": "Plug in Start and End. Set Trace Channel to Visibility. Turn Ignore Self on so the trace does not hit the player."
+        },
+        {
+          "title": "Draw it while testing",
+          "body": "Set Draw Debug Type to For Duration so you can see the line in the level. Turn this back to None when you are done debugging."
+        },
+        {
+          "title": "Branch on the hit",
+          "body": "Add a Branch and use the Return Value as the Condition. True means something blocked the line."
+        },
+        {
+          "title": "Read the hit",
+          "body": "Off the True pin, add Break Hit Result. Use Hit Actor, Impact Point, and Impact Normal for the rest of your gameplay."
+        }
+      ]
+    },
+    {
+      "id": "door-overlap",
+      "title": "Open a door on overlap",
+      "summary": "When the player enters a box, a Timeline swings the door open.",
+      "tags": ["door", "overlap", "proximity", "open", "trigger", "collision", "rotation"],
+      "nodes": ["On Component Begin Overlap", "Cast To", "Timeline", "Lerp (Rotator)", "Set Relative Rotation"],
+      "steps": [
+        {
+          "title": "Add a trigger",
+          "body": "In the door Blueprint, add a Box Collision and size it to the area the player should walk into."
+        },
+        {
+          "title": "Listen for overlap",
+          "body": "Select the box. In Details, add the event On Component Begin Overlap."
+        },
+        {
+          "title": "Make sure it is the player",
+          "body": "Off Other Actor, add Cast To your player character class, for example Cast To BP_ThirdPersonCharacter. Other actors are ignored."
+        },
+        {
+          "title": "Add a Timeline",
+          "body": "Right-click the graph and choose Add Timeline. Open it, add a Float Track from 0 to 1, and set the length, for example 1.0 second."
+        },
+        {
+          "title": "Lerp the rotation",
+          "body": "From the Cast success pin, call Play on the Timeline. Off Update, add Lerp (Rotator). A is the closed rotation, B is the open rotation (often 0, 90, 0), and Alpha is the Timeline float."
+        },
+        {
+          "title": "Rotate the mesh",
+          "body": "Add Set Relative Rotation on the door mesh and plug in the Lerp result. Put the mesh pivot on the hinge, or the door will swing from its center."
+        },
+        {
+          "title": "Optional: close it",
+          "body": "Add On Component End Overlap, Cast To the player again, and call Reverse on the Timeline so the door closes."
+        }
+      ]
+    },
+    {
+      "id": "enhanced-input",
+      "title": "Bind an Enhanced Input action",
+      "summary": "Create an Input Action, add it to a Mapping Context, and respond in the Event Graph.",
+      "tags": ["input", "enhanced", "key", "controller", "jump", "interact", "mapping", "ia", "imc"],
+      "nodes": ["Add Mapping Context", "Get Enhanced Input Local Player Subsystem", "Is Locally Controlled"],
+      "steps": [
+        {
+          "title": "Create an Input Action",
+          "body": "In the Content Browser, right-click, then Input, then Input Action. Name it, for example IA_Interact. Set Value Type to Digital (Bool) for a button, or Axis1D (Float) for an axis."
+        },
+        {
+          "title": "Create a Mapping Context",
+          "body": "Right-click, Input, Input Mapping Context. Open it, add a mapping for your Input Action, and bind a key, gamepad button, or mouse button."
+        },
+        {
+          "title": "Expose the context",
+          "body": "On your Character or Player Controller, add a variable of type Input Mapping Context and assign your IMC asset in Details."
+        },
+        {
+          "title": "Only set up the local player",
+          "body": "In Event BeginPlay, or Event Receive Controller Changed, add a Branch with Is Locally Controlled so only the owning client adds the context."
+        },
+        {
+          "title": "Add Mapping Context",
+          "body": "Get Controller, Cast To Player Controller, then Get Enhanced Input Local Player Subsystem. From the subsystem, add Add Mapping Context. Plug in your IMC and a Priority (0 is fine for one context)."
+        },
+        {
+          "title": "Add the action event",
+          "body": "In the Event Graph, right-click and add the event for your Input Action, named after the asset, for example IA_Interact."
+        },
+        {
+          "title": "Pick the right pin",
+          "body": "Use Started or Triggered for a one-shot button. Use Ongoing plus Action Value for an axis. Build your gameplay off that pin."
+        }
+      ]
+    },
+    {
+      "id": "timeline",
+      "title": "Animate with a Timeline",
+      "summary": "Use a Timeline float as Alpha to lerp location or rotation over time.",
+      "tags": ["timeline", "lerp", "animate", "interpolation", "curve", "open", "move"],
+      "nodes": ["Timeline", "Lerp", "Lerp (Rotator)", "VLerp", "Set Actor Location", "Set Relative Rotation"],
+      "steps": [
+        {
+          "title": "Add a Timeline",
+          "body": "In the Event Graph, right-click and choose Add Timeline. Give it a name, for example TL_Open."
+        },
+        {
+          "title": "Add a float track",
+          "body": "Double-click the Timeline. Add a Float Track. Add a key at time 0 with value 0, and a key at the end, for example 1.0s, with value 1. Set the length to match."
+        },
+        {
+          "title": "Play or reverse it",
+          "body": "Use the Play, Play from Start, or Reverse exec pins to start or reverse the animation."
+        },
+        {
+          "title": "Lerp with the update",
+          "body": "The Update pin fires every frame while it runs and outputs the track value. Use that as Alpha in Lerp, Lerp (Rotator), or VLerp."
+        },
+        {
+          "title": "Apply the result",
+          "body": "Plug the Lerp result into Set Actor Location, Set Actor Rotation, or Set Relative Rotation, depending on what you are moving."
+        },
+        {
+          "title": "React when it finishes",
+          "body": "The Finished pin fires when the Timeline reaches the end, or the start if you reversed it. Use it for a sound, a collision change, or a completed state."
+        }
+      ]
+    },
+    {
+      "id": "spawn-actor",
+      "title": "Spawn Actor from Class",
+      "summary": "Spawn a Blueprint at a transform and keep a valid reference to it.",
+      "tags": ["spawn", "instantiate", "projectile", "pickup", "enemy", "create"],
+      "nodes": ["Spawn Actor from Class", "Make Transform", "Is Valid"],
+      "steps": [
+        {
+          "title": "Add Spawn Actor from Class",
+          "body": "Set the Class pin to the Blueprint you want to spawn, or pass a Class variable."
+        },
+        {
+          "title": "Make a transform",
+          "body": "Add Make Transform. Location can come from Get Actor Location, a socket, or a Hit Result Impact Point. Set rotation and scale as needed."
+        },
+        {
+          "title": "Handle collisions",
+          "body": "Set Collision Handling Override. Try To Adjust Location, But Always Spawn is a safe default. Use Do Not Spawn if Colliding if you would rather fail than overlap."
+        },
+        {
+          "title": "Set Owner and Instigator",
+          "body": "Optionally set Owner and Instigator, often the player pawn or the Player Controller, so damage and ownership stay correct."
+        },
+        {
+          "title": "Check the return value",
+          "body": "The Return Value is the new actor. Add Is Valid and only use the reference if it spawned."
+        },
+        {
+          "title": "Initialize it",
+          "body": "To set variables before BeginPlay, expose them on spawn in the actor Blueprint, or call a setup function on the Return Value immediately."
+        }
+      ]
+    },
+    {
+      "id": "cast-to-player",
+      "title": "Cast To the player character",
+      "summary": "Turn a generic actor into your player class, or fail safely.",
+      "tags": ["cast", "player", "class", "type", "other actor", "hit actor"],
+      "nodes": ["Get Player Character", "Cast To", "Is Valid"],
+      "steps": [
+        {
+          "title": "Start with a generic reference",
+          "body": "Get an Actor or Pawn first, for example Other Actor from an overlap, Hit Actor from a trace, or Get Player Character."
+        },
+        {
+          "title": "Add Cast To",
+          "body": "Add Cast To and pick your player Blueprint, for example Cast To BP_ThirdPersonCharacter."
+        },
+        {
+          "title": "Use the success pin",
+          "body": "The top exec pin is the success path. On that pin the output is a typed reference, so class-specific functions and variables appear."
+        },
+        {
+          "title": "Handle Cast Failed",
+          "body": "The Cast Failed pin fires when the object is a different class or is not valid. Use it to ignore the event or try another path."
+        },
+        {
+          "title": "Do not recast every tick",
+          "body": "Store the successful reference in a variable. Later, use Is Valid instead of casting again."
+        },
+        {
+          "title": "Prefer interfaces when needed",
+          "body": "If many actor types should respond, use a Blueprint Interface instead of a chain of Cast To nodes."
+        }
+      ]
+    },
+    {
+      "id": "interface-call",
+      "title": "Call a Blueprint Interface",
+      "summary": "Send a message to any actor that implements your interface, with no Cast To chain.",
+      "tags": ["interface", "message", "interact", "bpi", "communication"],
+      "nodes": ["Does Implement Interface", "Branch", "Interact (Message)"],
+      "steps": [
+        {
+          "title": "Create the interface",
+          "body": "In the Content Browser, right-click, Blueprints, Blueprint Interface. Name it, for example BPI_Interact. Open it and add a function, such as Interact, with any inputs you need."
+        },
+        {
+          "title": "Implement it on the target",
+          "body": "Open the actor that should react, such as a door, pickup, or NPC. In Class Settings, add the interface under Implemented Interfaces."
+        },
+        {
+          "title": "Build the event",
+          "body": "In that actor's Event Graph, Event Interact, or your function name, now appears. Build the reaction there."
+        },
+        {
+          "title": "Get the target on the caller",
+          "body": "On the player or the object that starts the interaction, get the target actor, for example Hit Actor from a line trace."
+        },
+        {
+          "title": "Optional: check first",
+          "body": "Add Does Implement Interface, set Interface to BPI_Interact, then a Branch, so you only message valid targets."
+        },
+        {
+          "title": "Send the message",
+          "body": "From the target, add the message node Interact (Message). It shows an envelope icon. You do not need Cast To."
+        }
+      ]
+    },
+    {
+      "id": "set-timer",
+      "title": "Set Timer by Event",
+      "summary": "Run work on a repeating timer instead of Event Tick.",
+      "tags": ["timer", "tick", "loop", "delay", "periodic", "cooldown"],
+      "nodes": ["Set Timer by Event", "Clear and Invalidate Timer by Handle", "Custom Event"],
+      "steps": [
+        {
+          "title": "Prefer a timer to Tick",
+          "body": "Use a timer when the work only needs to run every so often, for example every 0.2 seconds, instead of Event Tick."
+        },
+        {
+          "title": "Add a Custom Event",
+          "body": "Add a Custom Event for the repeating work, for example Fire Pulse or Refresh Trace."
+        },
+        {
+          "title": "Start the timer",
+          "body": "At the start, on BeginPlay or when the ability starts, add Set Timer by Event. Drag from the Event pin and select your Custom Event."
+        },
+        {
+          "title": "Set time and looping",
+          "body": "Set Time to the period in seconds. Set Looping to true if it should repeat."
+        },
+        {
+          "title": "Store the handle",
+          "body": "Promote the Return Value to a variable of type Timer Handle so you can stop it later."
+        },
+        {
+          "title": "Clear it when done",
+          "body": "When the ability ends, add Clear and Invalidate Timer by Handle and pass that handle. This is cheaper and safer than leaving Event Tick running."
+        }
+      ]
+    },
+    {
+      "id": "create-widget",
+      "title": "Create a widget and add it to the viewport",
+      "summary": "Spawn a Widget Blueprint, show it, then remove it and restore game input.",
+      "tags": ["ui", "widget", "hud", "viewport", "cursor", "umg", "menu"],
+      "nodes": ["Create Widget", "Add to Viewport", "Remove from Parent", "Set Input Mode UI Only", "Set Input Mode Game Only", "Set Show Mouse Cursor"],
+      "steps": [
+        {
+          "title": "Make the widget",
+          "body": "Create a Widget Blueprint, for example WBP_InteractPrompt, and design the UI there."
+        },
+        {
+          "title": "Create Widget",
+          "body": "In the player or Player Controller graph, add Create Widget. Set Class to your widget, and set Owning Player to Get Player Controller."
+        },
+        {
+          "title": "Keep a reference",
+          "body": "Promote the Return Value to a variable so you can update or remove the same widget later."
+        },
+        {
+          "title": "Add to Viewport",
+          "body": "Off the Create Widget exec pin, add Add to Viewport and plug in the widget reference."
+        },
+        {
+          "title": "Switch input if needed",
+          "body": "If the widget needs a cursor, Get Player Controller, Set Show Mouse Cursor to true, and Set Input Mode UI Only, or Game and UI if the game should still receive input."
+        },
+        {
+          "title": "Close it cleanly",
+          "body": "Call Remove from Parent on the widget, then Set Input Mode Game Only and hide the cursor. Use Is Valid before removing if it might already be gone."
+        }
+      ]
+    },
+    {
+      "id": "player-controller",
+      "title": "Get Player Controller and Enable Input",
+      "summary": "Find the local player controller, enable input on an actor, or possess a pawn.",
+      "tags": ["controller", "possess", "enable input", "camera", "pawn", "cursor"],
+      "nodes": ["Get Player Controller", "Enable Input", "Disable Input", "Get Controlled Pawn", "Possess", "Get Control Rotation"],
+      "steps": [
+        {
+          "title": "Get Player Controller",
+          "body": "Add Get Player Controller. Player Index 0 is the local player in a single-player game."
+        },
+        {
+          "title": "Read the pawn or view",
+          "body": "From the controller you can Get Controlled Pawn, Get Player View Point, or Set Show Mouse Cursor."
+        },
+        {
+          "title": "Enable Input on an actor",
+          "body": "To let a usable object receive input, add Enable Input on that actor and pass the Player Controller."
+        },
+        {
+          "title": "Disable it later",
+          "body": "Pair it with Disable Input when the interaction ends so keys stop firing on that actor."
+        },
+        {
+          "title": "Get a look direction",
+          "body": "For aim or placement, Get Control Rotation from the Player Controller, then Get Forward Vector if you need a world direction."
+        },
+        {
+          "title": "Possess a new pawn",
+          "body": "After spawning or swapping pawns, use Possess on the Player Controller with the new pawn. Use UnPossess if you need to drop control first."
+        }
+      ]
+    },
+    {
+      "id": "launch-character",
+      "title": "Launch Character",
+      "summary": "Kick a Character with a world-space velocity, or use Add Impulse on a physics mesh.",
+      "tags": ["launch", "jump", "impulse", "knockback", "velocity", "bounce"],
+      "nodes": ["Launch Character", "Cast To Character", "Add Impulse", "Get Actor Forward Vector"],
+      "steps": [
+        {
+          "title": "You need a Character",
+          "body": "Launch Character only works on a Character, or a child of Character, not a raw Pawn or Actor. Get a Character reference, or Cast To Character."
+        },
+        {
+          "title": "Add Launch Character",
+          "body": "Launch Velocity is a world-space vector, for example (0, 0, 800) for an upward hop, or Get Actor Forward Vector × speed plus some Z."
+        },
+        {
+          "title": "Set the override flags",
+          "body": "XY Override, if true, replaces the current horizontal velocity. Z Override, if true, replaces the vertical velocity. Turn Z Override on for a consistent jump or bounce."
+        },
+        {
+          "title": "Call it once",
+          "body": "Call it from an overlap, an input event, or a hit. Calling it every tick will fight movement and feels wrong."
+        },
+        {
+          "title": "Physics meshes use Add Impulse",
+          "body": "For a simulating Static Mesh or Skeletal Mesh, use Add Impulse on the primitive component. Turn on Vel Change if you want a mass-independent kick."
+        }
+      ]
+    },
+    {
+      "id": "for-each-actors",
+      "title": "Get All Actors Of Class and For Each Loop",
+      "summary": "Find every actor of a class and run work on each one, but not on Tick.",
+      "tags": ["loop", "array", "get all actors", "foreach", "search", "enemies", "pickups"],
+      "nodes": ["Get All Actors Of Class", "For Each Loop", "Branch"],
+      "steps": [
+        {
+          "title": "Get All Actors Of Class",
+          "body": "Add Get All Actors Of Class and set Actor Class to the type you want, such as your pickup class, enemy class, or a parent class."
+        },
+        {
+          "title": "Add For Each Loop",
+          "body": "The Out Actors pin is an array. Add For Each Loop and plug the array in."
+        },
+        {
+          "title": "Use the loop body",
+          "body": "Loop Body runs once per actor. Array Element is the current actor. Array Index is its position in the array."
+        },
+        {
+          "title": "Filter inside the loop",
+          "body": "Put the per-actor work on Loop Body. Use a Branch inside the loop if only some actors should be affected."
+        },
+        {
+          "title": "Use the Completed pin",
+          "body": "The Completed pin fires after the last element. Use it for a summary, a Delay, or the next step in a Sequence."
+        },
+        {
+          "title": "Do not run this on Tick",
+          "body": "Get All Actors Of Class is expensive. Run it on BeginPlay, a timer, or a one-shot event, not Event Tick."
+        }
+      ]
+    },
+    {
+      "id": "is-valid-branch",
+      "title": "Is Valid and Branch",
+      "summary": "Guard destroyed references and split logic on a boolean.",
+      "tags": ["valid", "branch", "null", "accessed none", "boolean", "check"],
+      "nodes": ["Is Valid", "Branch"],
+      "steps": [
+        {
+          "title": "References can go stale",
+          "body": "When you store an actor, component, or widget in a variable, it can become stale if the object is destroyed."
+        },
+        {
+          "title": "Use the Is Valid exec node",
+          "body": "Add the exec node Is Valid, which has Is Valid and Is Not Valid pins, and plug in the object before you read it or call a function on it."
+        },
+        {
+          "title": "Exit on the failure pin",
+          "body": "Put the real work on the Is Valid pin. On Is Not Valid, clear the variable or exit early so you do not get an Accessed None warning."
+        },
+        {
+          "title": "Use Branch for booleans",
+          "body": "For a plain boolean check, use Branch. Give it a Condition, then build the True and False paths."
+        },
+        {
+          "title": "There is also a pure Is Valid",
+          "body": "A pure Is Valid node returns a boolean you can plug into Branch. Use whichever reads more clearly in the graph."
+        },
+        {
+          "title": "Common conditions",
+          "body": "Typical conditions are Return Value from a trace, Does Implement Interface, or Equal (Object) to compare with the player."
+        }
+      ]
+    },
+    {
+      "id": "delay-sequence",
+      "title": "Delay and Sequence",
+      "summary": "Fire several actions in order, and wait on one path without pausing the game.",
+      "tags": ["delay", "sequence", "wait", "beginplay", "latent", "order"],
+      "nodes": ["Sequence", "Delay"],
+      "steps": [
+        {
+          "title": "Add a Sequence",
+          "body": "Add a Sequence node when several actions should start in a fixed order from one event, such as Event BeginPlay."
+        },
+        {
+          "title": "Pins fire in order",
+          "body": "Then 0, Then 1, and Then 2 fire in order in the same frame, unless a Delay or another latent node pauses a path."
+        },
+        {
+          "title": "Add a Delay",
+          "body": "Add Delay on a path that should wait. Set Duration in seconds. Execution continues on the completed pin after the wait."
+        },
+        {
+          "title": "Delay is latent",
+          "body": "Delay only works on an execution path in an Actor or Component Blueprint, not in a pure function."
+        },
+        {
+          "title": "It does not pause the game",
+          "body": "A Delay does not pause the whole game, only that execution path. Other events still run."
+        },
+        {
+          "title": "Use a timer if it must cancel",
+          "body": "For work that must be canceled, such as an ability wind-up the player can interrupt, use Set Timer by Event and Clear and Invalidate Timer by Handle instead of Delay."
+        }
+      ]
+    },
+    {
+      "id": "play-sound",
+      "title": "Play Sound at Location",
+      "summary": "Play a one-shot sound in the world, or attach a looping sound to an actor.",
+      "tags": ["sound", "audio", "cue", "attached", "3d", "sfx"],
+      "nodes": ["Play Sound at Location", "Spawn Sound Attached", "Stop"],
+      "steps": [
+        {
+          "title": "Get a sound asset",
+          "body": "Import a Sound Wave, or create a Sound Cue if you need variation, attenuation, or concurrent limits."
+        },
+        {
+          "title": "Play Sound at Location",
+          "body": "Add Play Sound at Location. Set Sound to your asset. Set Location to the source, for example Get Actor Location or a Hit Result Impact Point."
+        },
+        {
+          "title": "Volume and pitch",
+          "body": "Adjust Volume Multiplier and Pitch Multiplier if needed. Leave them at 1.0 unless you want a change."
+        },
+        {
+          "title": "Follow a moving actor",
+          "body": "For a sound that should follow an actor, such as footsteps or a machine, use Spawn Sound Attached and attach it to a mesh or scene component."
+        },
+        {
+          "title": "Stop a looping sound",
+          "body": "Promote the Return Value of Spawn Sound Attached to an Audio Component variable, then call Stop or Destroy Component."
+        },
+        {
+          "title": "Add 3D falloff",
+          "body": "Assign an Attenuation Settings asset, or configure attenuation on the Sound Cue, so the sound gets quieter with distance."
+        }
+      ]
+    }
+  ]
+}

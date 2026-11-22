@@ -1,0 +1,447 @@
+/* Thespia HUD / Blueprint Help — Meta Ray-Ban Display Web App
+   Display is additive 600×600. Black canvas, bounded surfaces, large type.
+   Layout is viewport-relative; 600×600 is a validation target, not a hard-coded size. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+body {
+  background: #000;
+  color: #f5f5f5;
+  font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+.preview-hint {
+  display: none;
+  margin: 0;
+  max-inline-size: 36rem;
+  padding: 0 1rem;
+  color: #c8c8c8;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.preview-frame {
+  inline-size: 100%;
+  block-size: 100%;
+  background: #000;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+}
+
+.boot {
+  margin: 0;
+  padding: 1.5rem;
+  color: #c8c8c8;
+}
+
+/* Desktop preview chrome: only when the window is larger than the glasses viewport. */
+@media (min-width: 720px) and (min-height: 740px) {
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: #101010;
+  }
+
+  .preview-hint {
+    display: block;
+  }
+
+  .preview-hint[hidden] {
+    display: block;
+  }
+
+  .preview-frame {
+    inline-size: 600px;
+    block-size: 600px;
+    flex: none;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+    box-shadow: 0 0 0 1px #000, 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+
+.screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+  padding: 1.35rem 1.4rem 1.2rem;
+  min-inline-size: 0;
+}
+
+.screen-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0 0 0.85rem;
+  min-inline-size: 0;
+}
+
+.eyebrow,
+.meta,
+.hint,
+.status {
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: #7ee0ff;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+h1 {
+  font-size: 1.7rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+}
+
+.content {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* Bounded surfaces, not a bright full-bleed background. */
+.card,
+button.tile,
+.step-card,
+.field-wrap {
+  background: #161616;
+  border: 1px solid #3a3a3a;
+  border-radius: 0.7rem;
+}
+
+.card {
+  padding: 0.85rem 0.95rem;
+}
+
+.muted {
+  color: #bdbdbd;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input,
+a.tile {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a.tile {
+  display: block;
+  inline-size: 100%;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  background: #161616;
+  border: 1px solid #4a4a4a;
+  border-radius: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  min-block-size: 3rem;
+}
+
+button.primary {
+  background: #102028;
+  border-color: #7ee0ff;
+  color: #f5f5f5;
+}
+
+button.secondary {
+  inline-size: auto;
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.tile-title {
+  display: block;
+  font-weight: 650;
+  font-size: 1.2rem;
+}
+
+.tile-sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: #bdbdbd;
+  font-size: 0.92rem;
+}
+
+.coming-soon {
+  margin: 0;
+  padding: 0.4rem 0.1rem;
+  color: #8f8f8f;
+  font-size: 0.95rem;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+
+:where(button, a, input):focus {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+
+button:active,
+a.tile:active {
+  border-color: #fff;
+}
+
+label {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+
+input[type="search"],
+input[type="text"] {
+  inline-size: 100%;
+  min-block-size: 3rem;
+  padding: 0.7rem 0.8rem;
+  background: #0c0c0c;
+  border: 1px solid #5a5a5a;
+  border-radius: 0.6rem;
+  color: #fff;
+}
+
+input::placeholder {
+  color: #8d8d8d;
+}
+
+.field-wrap {
+  padding: 0.75rem 0.8rem 0.9rem;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+}
+
+.step-card {
+  padding: 1rem 1rem 1.1rem;
+  min-block-size: 0;
+}
+
+.step-card:focus,
+.step-card:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+
+.step-index {
+  margin: 0 0 0.45rem;
+  color: #7ee0ff;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.step-body {
+  margin: 0.45rem 0 0;
+  font-size: 1.12rem;
+  line-height: 1.4;
+}
+
+.nodes {
+  margin: 0.35rem 0 0;
+  color: #c8c8c8;
+  font-size: 0.9rem;
+}
+
+.status[data-kind="error"] {
+  color: #ffb4b4;
+}
+
+.status[data-kind="ok"] {
+  color: #9cffc5;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* HUD home: clock, Next up, app tile grid */
+.screen.hud-home {
+  padding: 1.1rem 1.2rem 1rem;
+  gap: 0;
+}
+
+.hud-header {
+  margin-bottom: 0.7rem;
+}
+
+.hud-clock {
+  font-size: 2.35rem;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.hud-date {
+  margin: 0.15rem 0 0;
+  color: #bdbdbd;
+  font-size: 0.95rem;
+}
+
+.next-up {
+  display: block;
+  inline-size: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: #161616;
+  border: 1px solid #3a3a3a;
+  border-radius: 0.7rem;
+  padding: 0.65rem 0.8rem;
+  min-block-size: 3rem;
+}
+
+.next-up-label {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: #7ee0ff;
+}
+
+.next-up-text {
+  display: block;
+  margin-top: 0.15rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.tile-grid button.tile {
+  padding: 0.55rem 0.6rem;
+  min-block-size: 3.5rem;
+}
+
+.tile-grid .tile-title {
+  font-size: 1.02rem;
+}
+
+.tile-grid .tile-sub {
+  font-size: 0.8rem;
+}
+
+button.tile.soon,
+button.tile[data-soon="true"] {
+  border-color: #333;
+}
+
+button.tile.soon .tile-title,
+button.tile[data-soon="true"] .tile-title {
+  color: #d8d8d8;
+}
+
+button.tile.soon .tile-sub,
+button.tile[data-soon="true"] .tile-sub {
+  color: #8f8f8f;
+}
+
+.screen.major-screen {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+select.field-select,
+select {
+  font: inherit;
+  color: inherit;
+  inline-size: 100%;
+  min-block-size: 3rem;
+  padding: 0.7rem 0.8rem;
+  background: #0c0c0c;
+  border: 1px solid #5a5a5a;
+  border-radius: 0.6rem;
+}
+
+:where(select):focus,
+:where(select):focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}

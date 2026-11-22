@@ -1,0 +1,20 @@
+# Secrets and local environment — never commit real keys
+.env
+*.env
+server/.env
+!.env.example
+!server/.env.example
+
+# Customer / work data
+*.csv
+
+# Local Python and editor junk
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.pem
+*.key
+id_rsa
+id_rsa.pub
