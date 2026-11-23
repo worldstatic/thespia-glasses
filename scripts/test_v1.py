@@ -125,6 +125,16 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("app.js missing Talk setup confirmation copy")
     if "consumeTalkSetup" not in js:
         failures.append("app.js must apply the setup fragment on load")
+    if "major-kind-preview" not in js or "major-kind-relay" not in js:
+        failures.append("Talk Settings must use Preview and Live relay toggle buttons")
+    if "field-select" in js or "<select" in js:
+        failures.append("Talk Settings must not use a native select dropdown")
+    if "Saved. Live relay is on." not in js or "Saved. Preview mode." not in js:
+        failures.append("Talk Settings is missing save confirmation copy")
+    if ".kind-toggle" not in css or ".kind-toggle-row" not in css:
+        failures.append("styles.css missing kind-toggle rules")
+    if 'if (relayUrl && token) kind = "relay"' not in js and "if (relayUrl && token) kind = \"relay\"" not in js:
+        failures.append("Talk Settings must auto-enable live relay when URL and token are set")
     if "speechSynthesis" not in js or "ArrowLeft" not in js:
         failures.append("input or TTS hooks missing")
     if "thespia.hud.favorites" not in js:
@@ -398,8 +408,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v8" not in sw and "${CACHE_PREFIX}v8" not in sw:
-        failures.append("service worker cache version should be v8")
+    if "thespia-blueprint-help-v9" not in sw and "${CACHE_PREFIX}v9" not in sw:
+        failures.append("service worker cache version should be v9")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
 

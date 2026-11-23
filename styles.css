@@ -845,3 +845,38 @@ button.tile.talk-pick .tile-title {
 .talk-card-head .step-index {
   margin: 0;
 }
+
+/* Talk Settings: arrow-navigable kind toggles (no native <select>) */
+.field-label {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+
+.kind-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+button.kind-toggle {
+  flex: 1 1 auto;
+  inline-size: auto;
+  text-align: center;
+  background: #000;
+  border: 1px solid #4a5a60;
+  color: #f5f5f5;
+  min-block-size: 3rem;
+}
+
+button.kind-toggle.selected {
+  background: #000;
+  border-color: #7ee0ff;
+  box-shadow: 0 0 10px rgba(126, 224, 255, 0.35);
+}
+
+button.kind-toggle:focus,
+button.kind-toggle:focus-visible {
+  outline: 2px solid #7ee0ff;
+  outline-offset: 3px;
+}

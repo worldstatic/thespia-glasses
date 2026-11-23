@@ -958,10 +958,49 @@
     );
   }
 
-  function renderMajorSettings() {
+  function selectedTalkKind() {
+    const group = document.getElementById("major-kind");
+    const value = group && group.dataset ? group.dataset.kind : "";
+    return value === "relay" ? "relay" : "mock";
+  }
+
+  function setTalkKindToggle(value) {
+    const kind = value === "relay" ? "relay" : "mock";
+    const group = document.getElementById("major-kind");
+    if (!group) return kind;
+    group.dataset.kind = kind;
+    const buttons = group.querySelectorAll("button.kind-toggle");
+    for (const button of buttons) {
+      const on = button.getAttribute("data-kind") === kind;
+      button.classList.toggle("selected", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    return kind;
+  }
+
+  function kindToggleButton(value, label, id, selected) {
+    return el(
+      "button",
+      {
+        type: "button",
+        id,
+        className: selected ? "kind-toggle selected" : "kind-toggle",
+        onClick: () => setTalkKindToggle(value),
+        attrs: {
+          "data-kind": value,
+          "aria-pressed": selected ? "true" : "false",
+        },
+      },
+      label
+    );
+  }
+
+  function renderMajorSettings(state) {
     const api = majorApi();
     const config = api ? api.loadConfig() : { kind: "mock", relayUrl: "", token: "" };
     const live = config.kind === "relay" || config.kind === "http";
+    const notice = state && state.notice ? state.notice : "";
+    const noticeKind = (state && state.noticeKind) || "";
     return screen([
       header("Talk", "Settings", "Stored on this device only"),
       el("div", { className: "content stack" }, [
@@ -969,20 +1008,24 @@
           className: "hint",
           text: "Preview mode works with no account. For live replies, paste your Worker URL and device token. Nothing here is stored in the app's source.",
         }),
+        notice
+          ? el("p", { className: "status", id: "major-settings-status", text: notice, dataset: { kind: noticeKind } })
+          : null,
         el("div", { className: "field-wrap stack" }, [
-          el("label", { htmlFor: "major-kind", text: "Reply source" }),
-          (function () {
-            const select = el(
-              "select",
-              { id: "major-kind", className: "field-select" },
-              [
-                el("option", { value: "mock", text: "Preview (on this device)" }),
-                el("option", { value: "relay", text: "Live relay" }),
-              ]
-            );
-            select.value = live ? "relay" : "mock";
-            return select;
-          })(),
+          el("p", { className: "field-label", id: "major-kind-label", text: "Reply source" }),
+          el(
+            "div",
+            {
+              className: "kind-toggle-row",
+              id: "major-kind",
+              dataset: { kind: live ? "relay" : "mock" },
+              attrs: { role: "group", "aria-labelledby": "major-kind-label" },
+            },
+            [
+              kindToggleButton("mock", "Preview", "major-kind-preview", !live),
+              kindToggleButton("relay", "Live relay", "major-kind-relay", live),
+            ]
+          ),
         ]),
         el("div", { className: "field-wrap stack" }, [
           el("label", { htmlFor: "major-endpoint", text: "Relay URL" }),
@@ -1022,11 +1065,13 @@
   function saveMajorSettings() {
     const api = majorApi();
     if (!api) return;
-    const kind = (document.getElementById("major-kind") || {}).value || "mock";
-    const relayUrl = (document.getElementById("major-endpoint") || {}).value || "";
-    const token = (document.getElementById("major-token") || {}).value || "";
+    const relayUrl = ((document.getElementById("major-endpoint") || {}).value || "").trim();
+    const token = ((document.getElementById("major-token") || {}).value || "").trim();
+    let kind = selectedTalkKind();
+    if (relayUrl && token) kind = "relay";
     api.saveConfig({ kind, relayUrl, token, endpoint: relayUrl, pollUrl: "" });
-    navigate({ screen: "talk-picker", notice: "Saved on this device.", noticeKind: "ok" });
+    const notice = kind === "relay" ? "Saved. Live relay is on." : "Saved. Preview mode.";
+    navigate({ screen: "major-settings", notice, noticeKind: "ok" }, { push: false });
   }
 
   function clearMajorSettings() {
@@ -3715,8 +3760,14 @@
         lastFocusSelector = state.pending ? "#major-card" : "#major-message";
         break;
       case "major-settings":
-        view = renderMajorSettings();
-        lastFocusSelector = "#major-kind";
+        view = renderMajorSettings(state);
+        lastFocusSelector = state && state.notice
+          ? "#save-major-settings"
+          : "#major-kind-preview";
+        if (!state || !state.notice) {
+          const selectedKind = view.querySelector("button.kind-toggle.selected");
+          if (selectedKind && selectedKind.id) lastFocusSelector = "#" + selectedKind.id;
+        }
         break;
       case "scale":
         view = renderScale();
