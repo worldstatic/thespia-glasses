@@ -107,6 +107,22 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("transport config key missing")
     if "thespia.hud.talk.threads" not in transport:
         failures.append("talk threads key missing from major-transport.js")
+    if "MAX_THREAD = 50" not in transport:
+        failures.append("talk threads must keep the newest 50 messages")
+    if "appendMessage" not in transport or "awaitReply" not in transport or "postText" not in transport:
+        failures.append("talk transport missing messenger send/poll helpers")
+    if "talk-thread" not in js or "talk-bubble-me" not in js or "talk-bubble-them" not in js:
+        failures.append("app.js missing messenger thread markup")
+    if "is typing" not in js:
+        failures.append("app.js missing typing indicator copy")
+    if "No reply yet. Tap to check again." not in js:
+        failures.append("app.js missing timeout retry bubble copy")
+    if "retryTalkReply" not in js or "scrollTalkThread" not in js:
+        failures.append("app.js missing retry or auto-scroll helpers")
+    if ".talk-thread" not in css or ".talk-bubble" not in css or ".talk-dots" not in css:
+        failures.append("styles.css missing messenger thread rules")
+    if "@keyframes talk-dot" not in css:
+        failures.append("styles.css missing CSS-only typing dots")
     if "function send(" not in transport and "send(text)" not in transport:
         failures.append("transport module missing send()")
     if "kind === \"mock\"" not in transport and 'kind === "mock"' not in transport:
@@ -408,8 +424,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v9" not in sw and "${CACHE_PREFIX}v9" not in sw:
-        failures.append("service worker cache version should be v9")
+    if "thespia-blueprint-help-v10" not in sw and "${CACHE_PREFIX}v10" not in sw:
+        failures.append("service worker cache version should be v10")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
 
@@ -885,6 +901,18 @@ def main() -> int:
         out = (setup_test.stdout or "") + (setup_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"talk-setup: {line}")
+
+    thread_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_talk_threads.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if thread_test.returncode != 0:
+        failures.append("talk thread tests failed")
+        out = (thread_test.stdout or "") + (thread_test.stderr or "")
+        for line in out.strip().splitlines()[-12:]:
+            failures.append(f"talk-threads: {line}")
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],

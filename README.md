@@ -16,7 +16,7 @@ A large window shows a 600×600 preview frame and keyboard hints. To preview at 
 
 Keyboard stand-ins for the Neural Band / Cap Touch:
 
-- **Left / Right** — previous or next recipe step, Talk reply card, Scale Check library entry, Task Cards list, or Teleprompter segment. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value
+- **Left / Right** — previous or next recipe step, Scale Check library entry, Task Cards list, or Teleprompter segment. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value. In a Talk thread, Up/Down on the thread scrolls older or newer messages
 - **Up / Down** or **Tab** — move between buttons, move through tasks, or change teleprompter speed (and spatial navigation if you start Chrome with `--enable-spatial-navigation`)
 - **Enter** — activate the focused button, mark a task done, pause or resume the teleprompter, or submit a dictated field
 
@@ -73,7 +73,7 @@ Favorites, recipes, tasks, scripts, measurements, and your stride stay in `local
 
 ## Talk (Major or C 2)
 
-The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate thread stored in `localStorage` on the device. The chat panel uses a `type=search` field so the on-glasses composer (and dictation) can open, a Send button, short reply cards you page with Left/Right, and optional read-aloud. While a live reply is in flight, the display shows “Major is thinking...” or “C 2 is thinking...”
+The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate messenger-style thread stored in `localStorage` on the device (newest 50 messages). Your messages sit on the right; their replies sit on the left with the small avatar and a short timestamp. The composer is a `type=search` field so the on-glasses composer (and dictation) can open, plus a Send button. Press Enter in the field to send. Optional read-aloud speaks the latest reply. After you send, your bubble appears at once, then “Major is typing…” or “C 2 is typing…” until the reply arrives. If the wait times out, a “No reply yet. Tap to check again.” bubble re-polls the same message.
 
 There is no official public chat API for Grok Bot in this app. Live replies use a Cloudflare Worker you control, with the Worker URL and device token pasted in Settings on the device (`type=search` fields). Until that is configured, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. A one-tap setup link can also store those values from a URL fragment; see [docs/talk-to-major.md](docs/talk-to-major.md).
 

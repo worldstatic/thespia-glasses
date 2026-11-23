@@ -880,3 +880,181 @@ button.kind-toggle:focus-visible {
   outline: 2px solid #7ee0ff;
   outline-offset: 3px;
 }
+
+
+/* Talk messenger thread — outline bubbles on a black additive display */
+.screen.talk-thread-screen {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+
+.talk-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: auto;
+  padding: 0.1rem 0.05rem 0.35rem;
+}
+
+.talk-empty {
+  margin: 0.6rem 0.2rem;
+  color: #8f8f8f;
+  font-size: 0.95rem;
+}
+
+.talk-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  max-inline-size: 100%;
+}
+
+.talk-row-me {
+  justify-content: flex-end;
+  margin-inline-start: 2.4rem;
+}
+
+.talk-row-them {
+  justify-content: flex-start;
+  margin-inline-end: 1.2rem;
+}
+
+.talk-avatar-sm {
+  width: 1.65rem;
+  height: 1.65rem;
+  margin-block-start: 0.4rem;
+}
+
+.talk-bubble-col {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.talk-bubble {
+  background: #000;
+  border: 1px solid #4a5a60;
+  border-radius: 0.85rem;
+  padding: 0.5rem 0.7rem 0.45rem;
+  max-inline-size: 100%;
+}
+
+.talk-bubble-me {
+  border-color: #7ee0ff;
+}
+
+.talk-row-them[data-to="major"] .talk-bubble-them {
+  border-color: #5fa8bd;
+}
+
+.talk-row-them[data-to="c2"] .talk-bubble-them {
+  border-color: #cbb4ff;
+}
+
+.talk-bubble-text {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.talk-ts {
+  margin: 0.18rem 0.2rem 0;
+  color: #8d8d8d;
+  font-size: 0.72rem;
+}
+
+.talk-row-me .talk-ts {
+  text-align: right;
+}
+
+button.talk-retry {
+  display: block;
+  inline-size: calc(100% - 1.2rem);
+  margin-inline: 0.6rem;
+  text-align: center;
+  background: #000;
+  border: 1px solid #8a8a8a;
+  border-radius: 0.85rem;
+  padding: 0.55rem 0.7rem 0.45rem;
+}
+
+button.talk-retry .talk-bubble-text,
+button.talk-retry .talk-ts {
+  text-align: center;
+}
+
+.talk-bubble-typing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.talk-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+
+.talk-dots span {
+  inline-size: 0.38rem;
+  block-size: 0.38rem;
+  border: 1px solid #7ee0ff;
+  border-radius: 50%;
+  background: transparent;
+  animation: talk-dot 1.2s ease-in-out infinite;
+}
+
+.talk-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.talk-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes talk-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.22;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.talk-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  min-inline-size: 0;
+}
+
+.talk-compose-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.talk-compose-row input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.talk-compose-row #major-send {
+  flex: 0 0 auto;
+  inline-size: auto;
+  min-inline-size: 4.8rem;
+  text-align: center;
+  padding-inline: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talk-dots span {
+    animation: none;
+    opacity: 0.8;
+  }
+}

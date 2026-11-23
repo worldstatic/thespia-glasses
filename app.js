@@ -71,6 +71,7 @@
   let scaleLibrary = null;
   let aiConfigured = false;
   let lastFocusSelector = null;
+  let talkInFlight = false;
   let clockTimer = null;
   let prompterRaf = null;
   let prompterPlay = null;
@@ -652,17 +653,116 @@
   function openTalk(to, extra) {
     const api = majorApi();
     const who = api && api.normalizeTo ? api.normalizeTo(to) : to === "c2" ? "c2" : "major";
-    const last = api && api.lastExchange ? api.lastExchange(who) : null;
     navigate({
       screen: "talk",
       to: who,
-      cardIndex: 0,
-      cards: last && last.cards ? last.cards : [],
-      from: last && last.from ? last.from : who,
       query: "",
       notice: "",
+      pending: false,
+      requestId: "",
       ...(extra || {}),
     });
+  }
+
+  function formatTalkTime(ts) {
+    const value = Number(ts);
+    if (!value) return "";
+    return formatTime(new Date(value));
+  }
+
+  function stillOnTalk(to) {
+    const state = currentState();
+    if (!state) return false;
+    if (state.screen !== "talk" && state.screen !== "major") return false;
+    return talkRecipient(state) === to;
+  }
+
+  function composerValue() {
+    const input = document.getElementById("major-message");
+    return input && input.value ? input.value : "";
+  }
+
+  function loadTalkMessages(to) {
+    const api = majorApi();
+    if (!api || typeof api.loadThread !== "function") return [];
+    const list = api.loadThread(to) || [];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function scrollTalkThread() {
+    const thread = document.getElementById("talk-thread");
+    if (!thread) return;
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function typingDots() {
+    return el("span", { className: "talk-dots", attrs: { "aria-hidden": "true" } }, [
+      el("span"),
+      el("span"),
+      el("span"),
+    ]);
+  }
+
+  function talkBubbleRow(message, to) {
+    const role = message && message.role;
+    const time = formatTalkTime(message && message.ts);
+    if (role === "system" || (message && message.status === "timeout")) {
+      return el(
+        "button",
+        {
+          type: "button",
+          className: "talk-retry",
+          id: "talk-retry",
+          onClick: () => retryTalkReply(message.requestId),
+        },
+        [
+          el("p", { className: "talk-bubble-text", text: message.text || "No reply yet. Tap to check again." }),
+          time ? el("p", { className: "talk-ts", text: time }) : null,
+        ]
+      );
+    }
+    if (role === "user") {
+      return el("div", { className: "talk-row talk-row-me" }, [
+        el("div", { className: "talk-bubble-col" }, [
+          el("div", { className: "talk-bubble talk-bubble-me" }, [
+            el("p", { className: "talk-bubble-text", text: message.text || "" }),
+          ]),
+          time ? el("p", { className: "talk-ts", text: time }) : null,
+        ]),
+      ]);
+    }
+    return el("div", { className: "talk-row talk-row-them", dataset: { to } }, [
+      avatarEl(to, "talk-avatar talk-avatar-sm"),
+      el("div", { className: "talk-bubble-col" }, [
+        el("div", { className: "talk-bubble talk-bubble-them" }, [
+          el("p", { className: "talk-bubble-text", text: message.text || "" }),
+        ]),
+        time ? el("p", { className: "talk-ts", text: time }) : null,
+      ]),
+    ]);
+  }
+
+  function typingRow(to) {
+    const name = talkName(to);
+    return el(
+      "div",
+      {
+        className: "talk-row talk-row-them talk-typing-row",
+        id: "talk-typing",
+        tabIndex: 0,
+        dataset: { to },
+        attrs: { "aria-label": `${name} is typing` },
+      },
+      [
+        avatarEl(to, "talk-avatar talk-avatar-sm"),
+        el("div", { className: "talk-bubble-col" }, [
+          el("div", { className: "talk-bubble talk-bubble-them talk-bubble-typing" }, [
+            el("p", { className: "talk-bubble-text", text: `${name} is typing…` }),
+            typingDots(),
+          ]),
+        ]),
+      ]
+    );
   }
 
 
@@ -762,70 +862,40 @@
 
   function renderMajor(state) {
     const api = majorApi();
-    const cards = state.cards || [];
-    const index = Math.max(0, Math.min(Math.max(cards.length - 1, 0), state.cardIndex || 0));
-    const card = cards[index];
     const query = state.query || "";
     const pending = Boolean(state.pending);
     const notice = state.notice || "";
     const status = api ? api.statusLabel() : "Talk is unavailable.";
-    const hint = api
-      ? "On glasses, activate the field to dictate. Web Apps cannot use the microphone directly."
-      : "The transport module did not load. Refresh the app.";
-
-    let panel;
     const to = talkRecipient(state);
-    const who = talkName(state.from || to);
-    const thinkingName = talkName(to);
-    if (pending) {
-      panel = el("article", { className: "step-card", id: "major-card" }, [
-        el("div", { className: "talk-card-head" }, [
-          avatarEl(to),
-          el("p", { className: "step-index", text: thinkingName }),
-        ]),
-        el("h2", { text: `${thinkingName} is thinking...` }),
-        el("p", { className: "step-body", text: "Waiting for a reply. This can take up to a few minutes." }),
-      ]);
-    } else if (card) {
-      panel = el(
-        "article",
-        {
-          className: "step-card",
-          tabIndex: 0,
-          id: "major-card",
-          attrs: { "aria-label": `${who}, reply ${index + 1} of ${cards.length}` },
-        },
-        [
-          el("div", { className: "talk-card-head" }, [
-            avatarEl(state.from || to),
-            el("p", { className: "step-index", text: `${who} · Reply ${index + 1} of ${cards.length}` }),
-          ]),
-          el("h2", { text: card.title || "Reply" }),
-          el("p", { className: "step-body", text: card.body || "" }),
-        ]
-      );
-    } else {
-      panel = el("article", { className: "step-card", id: "major-card" }, [
-        el("div", { className: "talk-card-head" }, [
-          avatarEl(to),
-          el("p", { className: "step-index", text: "Talk" }),
-        ]),
-        el("h2", { text: `Message ${thinkingName}` }),
+    const who = talkName(to);
+    const messages = loadTalkMessages(to);
+    const rows = messages.map((message) => talkBubbleRow(message, to));
+    if (pending) rows.push(typingRow(to));
+    if (!rows.length) {
+      rows.push(
         el("p", {
-          className: "step-body",
-          text: "Type or dictate a short message, then send. Preview replies work now. A live relay is added in Settings.",
-        }),
-      ]);
+          className: "talk-empty",
+          text: `Type or dictate a short message to ${who}. Preview replies stay on this device.`,
+        })
+      );
     }
-
     return screen(
       [
-        header("Talk", talkName(talkRecipient(state)), status),
-        el("div", { className: "content stack" }, [
-          panel,
+        header("Talk", who, status),
+        el(
+          "div",
+          {
+            className: "talk-thread",
+            id: "talk-thread",
+            tabIndex: 0,
+            attrs: { "aria-label": `${who} message thread` },
+          },
+          rows.concat([el("div", { id: "talk-thread-end" })])
+        ),
+        el("div", { className: "talk-compose" }, [
           notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
-          el("div", { className: "field-wrap stack" }, [
-            el("label", { htmlFor: "major-message", text: "Message" }),
+          el("label", { htmlFor: "major-message", className: "sr-only", text: "Message" }),
+          el("div", { className: "talk-compose-row" }, [
             el("input", {
               id: "major-message",
               type: "search",
@@ -833,20 +903,17 @@
               autocomplete: "off",
               placeholder: "Write or speak a message",
               value: query,
-              disabled: pending,
               attrs: { enterkeyhint: "send", spellcheck: "true" },
             }),
-            el("p", { className: "hint", text: hint }),
             el(
               "button",
               {
                 type: "button",
                 className: "primary",
                 id: "major-send",
-                disabled: pending || !api,
                 onClick: () => submitMajorMessage(),
               },
-              pending ? "Waiting…" : "Send"
+              pending ? "Wait" : "Send"
             ),
           ]),
         ]),
@@ -877,25 +944,22 @@
           homeButton(),
         ]),
       ],
-      "major-screen"
+      "talk-thread-screen"
     );
   }
 
-  function updateMajorCard(state, index, { speakCard = false } = {}) {
-    const cards = state.cards || [];
-    if (!cards.length) return;
-    const nextIndex = Math.max(0, Math.min(cards.length - 1, index));
-    const next = { ...state, cardIndex: nextIndex };
-    history.replaceState(next, "");
-    render(next);
-    if (speakCard) speakMajorFromState(next);
+  function lastAssistantText(to) {
+    const messages = loadTalkMessages(to);
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "assistant" && messages[i].text) return messages[i].text;
+    }
+    return "";
   }
 
   function speakMajorFromState(state) {
-    const cards = state.cards || [];
-    const card = cards[state.cardIndex || 0];
-    if (!card) return false;
-    return speak(`${card.title}. ${card.body}`);
+    const text = lastAssistantText(talkRecipient(state));
+    if (!text) return false;
+    return speak(text);
   }
 
   function speakMajorCard() {
@@ -907,55 +971,124 @@
     }
   }
 
+  function talkBase(to, extras) {
+    return {
+      screen: "talk",
+      to,
+      query: composerValue(),
+      pending: false,
+      requestId: "",
+      notice: "",
+      noticeKind: "",
+      ...(extras || {}),
+    };
+  }
+
+  function applyTalkResult(to, requestId, result) {
+    const api = majorApi();
+    if (api && typeof api.removeMessages === "function") {
+      api.removeMessages(to, (item) => item.requestId === requestId && (item.role === "system" || item.status === "timeout"));
+    }
+    if (result && result.timeout) {
+      if (api && typeof api.appendMessage === "function") {
+        api.appendMessage(to, {
+          role: "system",
+          text: "No reply yet. Tap to check again.",
+          requestId,
+          status: "timeout",
+        });
+      }
+    } else if (result && result.error) {
+      if (stillOnTalk(to)) {
+        navigate(talkBase(to, { notice: result.error, noticeKind: "error", requestId }), { push: false });
+      }
+      return;
+    } else if (api && typeof api.appendMessage === "function") {
+      const cards = (result && result.cards) || [];
+      const reply = (result && result.reply) || cards.map((card) => card.body).join(" ");
+      if (reply) {
+        api.appendMessage(to, {
+          role: "assistant",
+          text: reply,
+          requestId,
+          from: (result && result.from) || to,
+        });
+      }
+    }
+    if (stillOnTalk(to)) {
+      navigate(
+        talkBase(to, {
+          requestId: result && result.timeout ? requestId : "",
+        }),
+        { push: false }
+      );
+    }
+  }
+
+  async function retryTalkReply(requestId) {
+    const api = majorApi();
+    const current = currentState();
+    const to = talkRecipient(current);
+    const id = String(requestId || current.requestId || "");
+    if (!api || !id || talkInFlight) return;
+    if (typeof api.removeMessages === "function") {
+      api.removeMessages(to, (item) => item.requestId === id && (item.role === "system" || item.status === "timeout"));
+    }
+    talkInFlight = true;
+    navigate(talkBase(to, { pending: true, requestId: id, query: composerValue() }), { push: false });
+    try {
+      const result = await api.awaitReply(id, { to, source: (api.loadConfig() || {}).kind });
+      applyTalkResult(to, id, result);
+    } finally {
+      talkInFlight = false;
+    }
+  }
+
   async function submitMajorMessage() {
     const api = majorApi();
     const input = document.getElementById("major-message");
     const query = input && input.value ? input.value.trim() : "";
     const current = currentState();
     const to = talkRecipient(current);
-    const base = { screen: "talk", to, query, cards: current.cards || [], cardIndex: current.cardIndex || 0, from: current.from || to };
+    if (talkInFlight || (current && current.pending)) return;
     if (!api) {
-      navigate({ ...base, notice: "The transport module did not load.", noticeKind: "error" }, { push: false });
+      navigate(talkBase(to, { query, notice: "The transport module did not load.", noticeKind: "error" }), { push: false });
       return;
     }
     if (!query) {
-      navigate({ ...base, notice: "Type or dictate a message first.", noticeKind: "error" }, { push: false });
+      navigate(talkBase(to, { query: "", notice: "Type or dictate a message first.", noticeKind: "error" }), { push: false });
       return;
     }
-    navigate({ ...base, pending: true, notice: "", cards: [], cardIndex: 0 }, { push: false });
-    const result = await api.send(query, { to });
-    if (result && result.error) {
-      navigate(
-        {
-          screen: "talk",
-          to,
-          query,
-          pending: false,
-          cards: [],
-          cardIndex: 0,
-          from: to,
-          notice: result.error,
-          noticeKind: "error",
-        },
-        { push: false }
-      );
-      return;
+    if (typeof api.appendMessage === "function") {
+      api.appendMessage(to, { role: "user", text: query, ts: Date.now() });
     }
-    const preview = result && result.source === "mock";
-    navigate(
-      {
-        screen: "talk",
+    talkInFlight = true;
+    navigate(talkBase(to, { query: "", pending: true, notice: "" }), { push: false });
+    try {
+      const posted = await api.postText(query, { to });
+      if (posted && posted.error) {
+        if (stillOnTalk(to)) {
+          navigate(talkBase(to, { query, notice: posted.error, noticeKind: "error" }), { push: false });
+        }
+        return;
+      }
+      const requestId = posted && posted.requestId;
+      if (requestId && typeof api.replaceMessage !== "function") {
+        /* request id is used for poll retries */
+      }
+      if (stillOnTalk(to)) {
+        navigate(talkBase(to, { query: "", pending: true, requestId }), { push: false });
+      }
+      const result = await api.awaitReply(requestId, {
         to,
-        query: "",
-        pending: false,
-        cards: (result && result.cards) || [],
-        cardIndex: 0,
-        from: (result && result.from) || to,
-        notice: preview ? "Preview only. Nothing left this device." : "",
-        noticeKind: preview ? "ok" : "",
-      },
-      { push: false }
-    );
+        source: posted && posted.source,
+        text: query,
+        immediate: posted && posted.immediate,
+      });
+      applyTalkResult(to, requestId, result);
+    } finally {
+      talkInFlight = false;
+    }
   }
 
   function selectedTalkKind() {
@@ -3757,7 +3890,9 @@
       case "talk":
       case "major":
         view = renderMajor(state);
-        lastFocusSelector = state.pending ? "#major-card" : "#major-message";
+        if (state.pending) lastFocusSelector = "#talk-typing";
+        else if (view.querySelector("#talk-retry")) lastFocusSelector = "#talk-retry";
+        else lastFocusSelector = "#major-message";
         break;
       case "major-settings":
         view = renderMajorSettings(state);
@@ -3880,6 +4015,7 @@
       });
     }
     window.requestAnimationFrame(() => {
+      if (screenName === "talk" || screenName === "major") scrollTalkThread();
       const target = lastFocusSelector ? app.querySelector(lastFocusSelector) : null;
       if (target && typeof target.focus === "function") target.focus();
     });
@@ -4187,13 +4323,12 @@
       }
       return;
     }
-    if (state && (state.screen === "talk" || state.screen === "major") && (state.cards || []).length) {
-      if (event.key === "ArrowLeft") {
+    if (state && (state.screen === "talk" || state.screen === "major")) {
+      const thread = document.getElementById("talk-thread");
+      const onThread = event.target && (event.target.id === "talk-thread" || event.target.id === "talk-typing" || event.target.id === "talk-retry");
+      if (thread && onThread && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
         event.preventDefault();
-        updateMajorCard(state, (state.cardIndex || 0) - 1);
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        updateMajorCard(state, (state.cardIndex || 0) + 1);
+        thread.scrollTop += event.key === "ArrowDown" ? 80 : -80;
       }
     }
   }

@@ -7,9 +7,9 @@ Facts below were checked on 22 Nov 2026 against official Grok Bot help ([Skills 
 ## What the glasses app does
 
 - The **Talk** tile opens a picker: **Major** or **C 2**, each with an original outline avatar (cyan command chevron for Major, violet orb and amber monogram for C 2).
-- Each person has a separate thread in `localStorage` (`thespia.hud.talk.threads`).
+- Each person has a separate messenger-style thread in `localStorage` (`thespia.hud.talk.threads`), keeping the newest 50 messages.
 - The composer is a `type=search` field so on-glasses dictation can open. Replies are short cards, paged with Left/Right, with optional read-aloud.
-- While waiting on a live reply, the display shows “Major is thinking...” or “C 2 is thinking...” and times out after about three minutes.
+- After you send, your bubble appears immediately, then “Major is typing…” or “C 2 is typing…” while the glasses poll. If no reply arrives after about three minutes, a “No reply yet. Tap to check again.” bubble re-polls the same id.
 - `major-transport.js` has two built-in modes:
   1. **mock** (default). Practice replies. Nothing leaves the device.
   2. **relay**. `POST { "text", "to" }` to your Worker `/ask`, then poll `/poll?id=...` with the device token. `to` is `major` or `c2`.
