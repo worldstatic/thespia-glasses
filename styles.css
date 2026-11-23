@@ -1095,6 +1095,15 @@ button.kind-toggle:focus-visible {
   align-items: flex-start;
   gap: 0.4rem;
   max-inline-size: 100%;
+  border-radius: 0.9rem;
+}
+
+.talk-row:focus,
+.talk-row:focus-visible,
+#talk-typing:focus,
+#talk-typing:focus-visible {
+  outline: 2px solid #7ee0ff;
+  outline-offset: 3px;
 }
 
 .talk-row-me {

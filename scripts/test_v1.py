@@ -193,6 +193,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("styles.css missing HUD background art")
     if "funds.js" not in html:
         failures.append("index.html must load funds.js")
+    if "focus-nav.js" not in html:
+        failures.append("index.html must load focus-nav.js")
     if 'id: "funds-amount"' in js:
         idx = js.find('id: "funds-amount"')
         window = js[idx: idx + 280]
@@ -472,12 +474,14 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v12" not in sw and "${CACHE_PREFIX}v12" not in sw:
-        failures.append("service worker cache version should be v12")
+    if "thespia-blueprint-help-v13" not in sw and "${CACHE_PREFIX}v13" not in sw:
+        failures.append("service worker cache version should be v13")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
         failures.append("service worker must precache funds.js and the HUD background")
+    if "focus-nav.js" not in sw:
+        failures.append("service worker must precache focus-nav.js")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -980,6 +984,18 @@ def main() -> int:
         out = (funds_test.stdout or "") + (funds_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"funds: {line}")
+
+    nav_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_nav.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if nav_test.returncode != 0:
+        failures.append("glasses navigation tests failed")
+        out = (nav_test.stdout or "") + (nav_test.stderr or "")
+        for line in out.strip().splitlines()[-12:]:
+            failures.append(f"nav: {line}")
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],

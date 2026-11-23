@@ -23,6 +23,7 @@ SHIP_GLOBS = [
     "tasks.js",
     "funds.js",
     "prompter.js",
+    "focus-nav.js",
     "styles.css",
     "sw.js",
     "library.json",

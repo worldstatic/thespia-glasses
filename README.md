@@ -41,13 +41,13 @@ The app opens to a glanceable **World Static** dashboard (no app tiles on home):
 - A short line with the last message from Major or C 2
 - One primary **Apps** button
 
-App tiles live on a separate **Apps** screen. **Add spend** is there: type an amount in a `type=search` field and press Enter to add it to today's running total. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
+App tiles live on a separate **Apps** screen. **Add spend** is there: type an amount in a `type=search` field, press Enter or Arrow Down to move to the label, then press Enter on the label or Save to add it to today's running total. Arrow Up/Down also move between Amount, Label, Save, and Home while a field is focused. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
 
 ## Task Cards
 
 General-purpose lists, defaulting to **Work**, **Home**, and **Projects**. You can create and rename lists. Each task has a title (dictate in a `search` field), an optional note, done/undone, and an optional due day (`today`, `Friday`, or `Nov 25`).
 
-Left/Right switch lists. Up/Down move through tasks. Enter marks the selected task done or opens it from the list. **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
+Left/Right switch lists. Up/Down move through tasks. Arrow Down from the last card reaches **New task** and the rest of the bottom bar; Arrow Up from New task returns to the last card. Long lists scroll the focused card into view. Enter marks the selected task done or opens it from the list. **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
 
 The shipped seed tasks are generic examples only. Do not put work CSVs or customer data into a backup you share.
 
@@ -78,7 +78,7 @@ Favorites, recipes, tasks, scripts, measurements, and your stride stay in `local
 
 ## Talk (Major or C 2)
 
-The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate messenger-style thread stored in `localStorage` on the device (newest 50 messages). Your messages sit on the right; their replies sit on the left with the small avatar and a short timestamp. The composer is a `type=search` field so the on-glasses composer (and dictation) can open, plus a Send button. Press Enter in the field to send. Optional read-aloud speaks the latest reply. After you send, your bubble appears at once, then “Major is typing…” or “C 2 is typing…” until the reply arrives. If the wait times out, a “No reply yet. Tap to check again.” bubble re-polls the same message.
+The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate messenger-style thread stored in `localStorage` on the device (newest 50 messages). Your messages sit on the right; their replies sit on the left with the small avatar and a short timestamp. The composer is a `type=search` field so the on-glasses composer (and dictation) can open, plus a Send button. Talk opens with the composer focused. Arrow Up moves into the message history; Arrow Down from any bubble (or the typing/retry row) returns to the input. The thread scroller itself is not focusable, so it cannot trap the arrows. Press Enter in the field to send. Optional read-aloud speaks the latest reply. After you send, your bubble appears at once, then “Major is typing…” or “C 2 is typing…” until the reply arrives. If the wait times out, a “No reply yet. Tap to check again.” bubble re-polls the same message.
 
 There is no official public chat API for Grok Bot in this app. Live replies use a Cloudflare Worker you control, with the Worker URL and device token pasted in Settings on the device (`type=search` fields). Until that is configured, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. A one-tap setup link can also store those values from a URL fragment; see [docs/talk-to-major.md](docs/talk-to-major.md).
 
@@ -101,7 +101,7 @@ This repo is meant to be public. Do not put personal information, work CSVs, pas
 Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.developer.meta.com/docs/develop/webapps/) guides.
 
 - Display is an additive 600×600 waveguide. Use a black canvas and high-contrast outlined surfaces. Size from the viewport; treat 600×600 as a validation target.
-- Neural Band and Cap Touch become `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Enter`. The browser moves focus; Enter activates the focused control.
+- Neural Band and Cap Touch become `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Enter`. Arrow Up/Down move focus between controls on a screen, including while a `type=search` field is focused (so dictation fields do not trap the arrows). Left/Right in a text field still move the caret. Enter activates the focused control, or moves to the next field when a form spells that out (Add spend Amount → Label).
 - Web Apps cannot use the microphone. Voice input uses the on-glasses composer (activate the search field to dictate). That needs firmware v127+ and Meta AI app v272+.
 - Text to speech uses `window.speechSynthesis`. App data uses `localStorage`. A service worker can cache the app shell after a first online visit.
 - The glasses app icon comes from `.well-known/meta-wearables-manifest.json`. This repo includes a `.nojekyll` file so Pages serves that folder. The app name and short name are **World Static**.

@@ -1085,9 +1085,10 @@
     ]);
   }
 
-  function talkBubbleRow(message, to) {
+  function talkBubbleRow(message, to, index) {
     const role = message && message.role;
     const time = formatTalkTime(message && message.ts);
+    const rowId = "talk-msg-" + (index == null ? "0" : String(index));
     if (role === "system" || (message && message.status === "timeout")) {
       return el(
         "button",
@@ -1095,6 +1096,7 @@
           type: "button",
           className: "talk-retry",
           id: "talk-retry",
+          tabIndex: 0,
           onClick: () => retryTalkReply(message.requestId),
         },
         [
@@ -1104,7 +1106,7 @@
       );
     }
     if (role === "user") {
-      return el("div", { className: "talk-row talk-row-me" }, [
+      return el("div", { className: "talk-row talk-row-me", id: rowId, tabIndex: 0 }, [
         el("div", { className: "talk-bubble-col" }, [
           el("div", { className: "talk-bubble talk-bubble-me" }, [
             el("p", { className: "talk-bubble-text", text: message.text || "" }),
@@ -1113,7 +1115,7 @@
         ]),
       ]);
     }
-    return el("div", { className: "talk-row talk-row-them", dataset: { to } }, [
+    return el("div", { className: "talk-row talk-row-them", id: rowId, tabIndex: 0, dataset: { to } }, [
       avatarEl(to, "talk-avatar talk-avatar-sm"),
       el("div", { className: "talk-bubble-col" }, [
         el("div", { className: "talk-bubble talk-bubble-them" }, [
@@ -1251,7 +1253,7 @@
     const to = talkRecipient(state);
     const who = talkName(to);
     const messages = loadTalkMessages(to);
-    const rows = messages.map((message) => talkBubbleRow(message, to));
+    const rows = messages.map((message, index) => talkBubbleRow(message, to, index));
     if (pending) rows.push(typingRow(to));
     if (!rows.length) {
       rows.push(
@@ -1269,8 +1271,7 @@
           {
             className: "talk-thread",
             id: "talk-thread",
-            tabIndex: 0,
-            attrs: { "aria-label": `${who} message thread` },
+            attrs: { role: "log", "aria-label": `${who} message thread` },
           },
           rows.concat([el("div", { id: "talk-thread-end" })])
         ),
@@ -3272,7 +3273,7 @@
             {
               type: "button",
               className: "tile task-item" + (index === sel.taskIndex ? " is-selected" : "") + (task.done ? " is-done" : ""),
-              id: index === sel.taskIndex ? "selected-task" : undefined,
+              id: index === sel.taskIndex ? "selected-task" : "task-item-" + index,
               dataset: { taskId: task.id },
               onClick: () => {
                 if (index === sel.taskIndex) toggleSelectedTask({ ...state, listId: sel.list.id, taskId: task.id, taskIndex: index });
@@ -4277,9 +4278,7 @@
       case "talk":
       case "major":
         view = renderMajor(state);
-        if (state.pending) lastFocusSelector = "#talk-typing";
-        else if (view.querySelector("#talk-retry")) lastFocusSelector = "#talk-retry";
-        else lastFocusSelector = "#major-message";
+        lastFocusSelector = "#major-message";
         break;
       case "major-settings":
         view = renderMajorSettings(state);
@@ -4420,7 +4419,16 @@
     window.requestAnimationFrame(() => {
       if (screenName === "talk" || screenName === "major") scrollTalkThread();
       const target = lastFocusSelector ? app.querySelector(lastFocusSelector) : null;
-      if (target && typeof target.focus === "function") target.focus();
+      if (target && typeof target.focus === "function") {
+        target.focus();
+        if (typeof target.scrollIntoView === "function") {
+          try {
+            target.scrollIntoView({ block: "nearest", inline: "nearest" });
+          } catch (_err) {
+            target.scrollIntoView(false);
+          }
+        }
+      }
     });
   }
 
@@ -4535,6 +4543,82 @@
     );
   }
 
+  function focusNavApi() {
+    return window.WorldStaticFocusNav || null;
+  }
+
+  function screenFocusables() {
+    const nav = focusNavApi();
+    const root = (app && app.querySelector(".screen")) || app;
+    if (nav && typeof nav.collectFocusables === "function") return nav.collectFocusables(root);
+    return [];
+  }
+
+  function focusNode(node) {
+    if (!node || typeof node.focus !== "function") return false;
+    node.focus();
+    if (typeof node.scrollIntoView === "function") {
+      try {
+        node.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch (_err) {
+        node.scrollIntoView(false);
+      }
+    }
+    return true;
+  }
+
+  function moveLinearFocus(dir, current) {
+    const nav = focusNavApi();
+    const items = screenFocusables();
+    if (!items.length) return false;
+    const next = nav && typeof nav.step === "function" ? nav.step(items, current || document.activeElement, dir) : null;
+    if (!next) return false;
+    return focusNode(next);
+  }
+
+  function handleTaskListArrow(state, event) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return false;
+    const nav = focusNavApi();
+    const sel = resolveTaskSelection(state);
+    const footerIds = (nav && nav.TASK_FOOTER_IDS) || ["open-new-task", "open-task-actions", "open-task-lists", "go-home"];
+    const target = event.target;
+    const footerId = target && footerIds.indexOf(target.id) >= 0 ? target.id : "";
+    const model = nav && typeof nav.taskArrow === "function"
+      ? nav.taskArrow(
+          {
+            focus: footerId ? "footer" : "list",
+            taskIndex: sel.taskIndex,
+            taskCount: sel.tasks.length,
+            footerIndex: footerId ? footerIds.indexOf(footerId) : 0,
+            footerIds: footerIds,
+          },
+          event.key
+        )
+      : null;
+    if (!model) return false;
+    event.preventDefault();
+    if (model.focus === "footer") {
+      return focusNode(document.getElementById(model.footerId || "open-new-task"));
+    }
+    if (model.taskIndex !== sel.taskIndex) {
+      shiftTaskIndex(state, model.taskIndex > sel.taskIndex ? 1 : -1);
+      return true;
+    }
+    return focusNode(document.getElementById("selected-task"));
+  }
+
+  function handleLinearArrow(event) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return false;
+    const state = currentState();
+    const screenName = state && state.screen;
+    if (screenName === "prompter-play") return false;
+    if (screenName === "scale-convert" && event.target && event.target.id === "scale-value-panel") return false;
+    if (screenName === "tasks") return handleTaskListArrow(state, event);
+    event.preventDefault();
+    moveLinearFocus(event.key === "ArrowDown" ? 1 : -1, event.target);
+    return true;
+  }
+
   function onGlobalKeyDown(event) {
     const state = currentState();
     if (event.key === "Enter" && event.target && event.target.id === "question") {
@@ -4547,13 +4631,15 @@
       submitMajorMessage();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "funds-amount") {
+    if (event.key === "Enter" && event.target && (event.target.id === "funds-amount" || event.target.id === "funds-label" || event.target.id === "save-funds-spend")) {
+      const nav = focusNavApi();
+      const action = nav && typeof nav.fundsEnter === "function" ? nav.fundsEnter(event.target.id) : null;
       event.preventDefault();
-      submitAddSpend();
-      return;
-    }
-    if (event.key === "Enter" && event.target && event.target.id === "funds-label") {
-      event.preventDefault();
+      if (action && action.action === "focus") {
+        const next = document.getElementById(action.id);
+        if (next && typeof next.focus === "function") next.focus();
+        return;
+      }
       submitAddSpend();
       return;
     }
@@ -4643,6 +4729,7 @@
       if (input && typeof input.focus === "function") input.focus();
       return;
     }
+    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && handleLinearArrow(event)) return;
     if (isTypingTarget(event.target)) return;
     if (state && state.screen === "prompter-play") {
       if (event.key === "Enter") {
@@ -4680,16 +4767,6 @@
       if (event.key === "ArrowRight") {
         event.preventDefault();
         shiftTaskList(state, 1);
-        return;
-      }
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        shiftTaskIndex(state, -1);
-        return;
-      }
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        shiftTaskIndex(state, 1);
         return;
       }
     }
@@ -4730,28 +4807,24 @@
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         updateStep(state, (state.step || 0) - 1);
-      } else if (event.key === "ArrowRight") {
+        return;
+      }
+      if (event.key === "ArrowRight") {
         event.preventDefault();
         updateStep(state, (state.step || 0) + 1);
+        return;
       }
-      return;
     }
     if (state && state.screen === "scale-category") {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         updateScaleCategory(state, (state.entryIndex || 0) - 1);
-      } else if (event.key === "ArrowRight") {
+        return;
+      }
+      if (event.key === "ArrowRight") {
         event.preventDefault();
         updateScaleCategory(state, (state.entryIndex || 0) + 1);
-      }
-      return;
-    }
-    if (state && (state.screen === "talk" || state.screen === "major")) {
-      const thread = document.getElementById("talk-thread");
-      const onThread = event.target && (event.target.id === "talk-thread" || event.target.id === "talk-typing" || event.target.id === "talk-retry");
-      if (thread && onThread && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
-        event.preventDefault();
-        thread.scrollTop += event.key === "ArrowDown" ? 80 : -80;
+        return;
       }
     }
   }
