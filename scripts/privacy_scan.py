@@ -21,6 +21,7 @@ SHIP_GLOBS = [
     "major-transport.js",
     "scale.js",
     "tasks.js",
+    "funds.js",
     "prompter.js",
     "styles.css",
     "sw.js",

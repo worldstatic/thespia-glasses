@@ -32,11 +32,17 @@ That command also runs the privacy scan (`scripts/privacy_scan.py`).
 
 ## Home screen
 
-The app opens to the **World Static** home screen:
+The app opens to a glanceable **World Static** dashboard (no app tiles on home):
 
+- A dim, outline-treated crop of Thespia campaign art (the colony quarters with a cyan ore vein and a viewport to the chained hulls) sits behind the UI. It is darkened for the additive 600×600 display, where black reads as transparent, so the clock and cards stay readable. The source is official Thespia concept art already made for the game — no people, no workplace photos, and no personal information
 - The World Static logo and wordmark, a large clock, and the date, updated on the device
-- A **Next up** strip that shows your top unfinished Task Card (soonest due day first). Open it to jump to that task
-- A tile grid: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** work now. **3D Scan** and **Overlock Walk** are marked Coming soon
+- The current **Task** card from your Task Cards data (soonest due day first). Open it to jump to that task
+- **Daily funds**: today's budget, spent, and remaining, with a simple bar. **Add spend** is on the home footer: type an amount in a `type=search` field and press Enter to add it to the running total. You can set the budget from the funds card. Spent resets at local midnight; a short history stays on the device. Nothing is sent anywhere
+- **Next up**: one schedule line you set (the next stream or shift), stored in `localStorage`
+- A short line with the last message from Major or C 2
+- One primary **Apps** button
+
+App tiles live on a separate **Apps** screen: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
 
 ## Task Cards
 
@@ -89,7 +95,7 @@ The app must be on a public HTTPS URL (GitHub Pages once enabled). In the Meta A
 
 ## Privacy
 
-This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, and Talk settings and threads stay in `localStorage` on the device. A live relay URL or token, if you add one, is entered on the glasses and is never part of this source.
+This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, Talk settings and threads, daily funds, and Next up stay in `localStorage` on the device. A live relay URL or token, if you add one, is entered on the glasses and is never part of this source.
 
 ## What this app assumes from Meta's docs
 
@@ -103,7 +109,7 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 
 ## File list
 
-- `index.html`, `styles.css`, `app.js` — World Static home screen, Task Cards, Teleprompter, Blueprint Help, Scale Check, and Talk to Major
+- `index.html`, `styles.css`, `app.js`, `funds.js` — World Static dashboard, Apps, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, and daily funds
 - `tasks.js` — Task Cards storage, due-day parsing, and export/import
 - `prompter.js` — Teleprompter storage, segment parsing, and export/import
 - `major-transport.js` — pluggable message transport (mock preview, optional on-device HTTPS bridge)

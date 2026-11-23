@@ -48,6 +48,11 @@ body {
   inline-size: 100%;
   block-size: 100%;
   overflow: hidden;
+  background-color: #000;
+  background-image: url("./icons/hud-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .boot {
@@ -93,6 +98,10 @@ body {
   overflow: hidden;
   padding: 1.35rem 1.4rem 1.2rem;
   min-inline-size: 0;
+}
+
+.screen:not(.hud-home):not(.apps-screen):not(.funds-entry-screen):not(.funds-budget-screen):not(.next-up-screen) {
+  background-color: #000;
 }
 
 .screen-header {
@@ -351,10 +360,18 @@ input::placeholder {
   border: 0;
 }
 
-/* HUD home: wordmark, clock, Next up, app tile grid */
+/* HUD home: glanceable dashboard on a dim Thespia art ground */
 .screen.hud-home {
-  padding: 0.95rem 1.05rem 0.85rem;
+  padding: 0.85rem 0.95rem 0.75rem;
   gap: 0;
+  background-color: transparent;
+}
+
+.screen.apps-screen,
+.screen.funds-entry-screen,
+.screen.funds-budget-screen,
+.screen.next-up-screen {
+  background-color: transparent;
 }
 
 .hud-header {
@@ -447,7 +464,7 @@ input::placeholder {
 }
 
 .hud-clock {
-  font-size: 3.05rem;
+  font-size: 2.7rem;
   font-weight: 650;
   letter-spacing: -0.05em;
   line-height: 1;
@@ -499,6 +516,83 @@ input::placeholder {
 .next-up-list {
   color: #ffb86b;
   font-weight: 550;
+}
+
+.dash-stack {
+  gap: 0.4rem;
+}
+
+button.dash-card {
+  display: block;
+  inline-size: 100%;
+  text-align: left;
+  background: #000;
+  border: 1px solid rgba(126, 224, 255, 0.38);
+  border-radius: 0.65rem;
+  padding: 0.4rem 0.65rem 0.42rem;
+  min-block-size: 0;
+}
+
+button.dash-card:focus,
+button.dash-card:focus-visible {
+  border-color: #7ee0ff;
+  box-shadow: 0 0 12px rgba(126, 224, 255, 0.32);
+}
+
+.dash-label {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  color: #7ee0ff;
+}
+
+.dash-text {
+  display: block;
+  margin-top: 0.1rem;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.dash-sub {
+  display: block;
+  margin-top: 0.08rem;
+  color: #bdbdbd;
+  font-size: 0.78rem;
+}
+
+.funds-bar {
+  margin-top: 0.35rem;
+  block-size: 0.42rem;
+  border: 1px solid #4a5a60;
+  border-radius: 999px;
+  background: #000;
+  overflow: hidden;
+}
+
+.funds-bar-fill {
+  display: block;
+  block-size: 100%;
+  min-inline-size: 0;
+  background: #041018;
+  box-shadow: inset 0 0 0 1px #7ee0ff;
+}
+
+button.funds-card.over {
+  border-color: rgba(255, 180, 180, 0.55);
+}
+
+button.funds-card.over .funds-bar {
+  border-color: #ffb4b4;
+}
+
+button.funds-card.over .funds-bar-fill {
+  box-shadow: inset 0 0 0 1px #ffb4b4;
+}
+
+.hud-footer {
+  margin-top: 0.55rem;
 }
 
 .tile-grid {

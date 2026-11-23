@@ -9,6 +9,8 @@
 
   const HOME_STATE = { screen: "home" };
   const FAVORITES_KEY = "thespia.hud.favorites";
+  const NEXT_UP_KEY = "thespia.hud.nextup";
+  const NEXT_UP_MAX = 80;
   const API_ASK = "./api/ask";
   const API_HEALTH = "./api/health";
 
@@ -528,12 +530,117 @@
     navigate({ screen: tile.screen });
   }
 
-  function renderHome() {
-    const now = new Date();
-    const api = tasksApi();
-    const data = api ? api.loadAndPersist() : null;
-    const next = data && api ? api.topUnfinished(data) : null;
-    const tiles = APP_TILES.map((tile) =>
+  function fundsApi() {
+    return window.WorldStaticFunds || null;
+  }
+
+  function loadNextUp() {
+    try {
+      const raw = localStorage.getItem(NEXT_UP_KEY);
+      if (!raw) return { text: "" };
+      const parsed = JSON.parse(raw);
+      const text = typeof parsed === "string" ? parsed : parsed && parsed.text;
+      return { text: String(text || "").slice(0, NEXT_UP_MAX) };
+    } catch (err) {
+      try {
+        localStorage.removeItem(NEXT_UP_KEY);
+      } catch (_ignored) {}
+      return { text: "" };
+    }
+  }
+
+  function saveNextUp(text) {
+    const next = { text: String(text || "").trim().slice(0, NEXT_UP_MAX) };
+    try {
+      localStorage.setItem(NEXT_UP_KEY, JSON.stringify(next));
+    } catch (err) {
+      console.warn("Could not save Next up on this device.");
+    }
+    return next;
+  }
+
+  function clearNextUp() {
+    try {
+      localStorage.removeItem(NEXT_UP_KEY);
+    } catch (_ignored) {}
+    return { text: "" };
+  }
+
+  function lastTalkPreview() {
+    const api = majorApi();
+    if (!api || typeof api.loadThread !== "function") return null;
+    const people = api.RECIPIENTS || ["major", "c2"];
+    let best = null;
+    for (const who of people) {
+      const list = api.loadThread(who) || [];
+      for (const message of list) {
+        if (!message || message.role !== "assistant" || !message.text) continue;
+        const ts = Number(message.ts) || 0;
+        if (!best || ts >= best.ts) {
+          best = { to: who, text: String(message.text), ts };
+        }
+      }
+    }
+    return best;
+  }
+
+  function clipText(text, max) {
+    const value = String(text || "").replace(/\s+/g, " ").trim();
+    if (value.length <= max) return value;
+    return value.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+  }
+
+  function dashCard(id, label, text, sub, onClick, extraClass) {
+    return el(
+      "button",
+      {
+        type: "button",
+        className: extraClass ? "dash-card " + extraClass : "dash-card",
+        id,
+        onClick,
+      },
+      [
+        el("span", { className: "dash-label", text: label }),
+        el("span", { className: "dash-text", text: text || "" }),
+        sub ? el("span", { className: "dash-sub", text: sub }) : null,
+      ]
+    );
+  }
+
+  function renderFundsCard(funds) {
+    const api = fundsApi();
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const budget = funds ? Number(funds.budget) || 0 : 0;
+    const spent = funds ? Number(funds.spent) || 0 : 0;
+    const left = api && funds ? api.remaining(funds) : 0;
+    const ratio = api && funds ? api.spentRatio(funds) : 0;
+    const over = left < 0;
+    const summary = budget ? "Spent " + money(spent) + "  ·  Left " + money(left) : "Set a daily budget";
+    const meta = budget ? "Budget " + money(budget) : "Kept on this device";
+    return el(
+      "button",
+      {
+        type: "button",
+        className: over ? "dash-card funds-card over" : "dash-card funds-card",
+        id: "open-funds",
+        onClick: () => navigate({ screen: "funds-budget" }),
+      },
+      [
+        el("span", { className: "dash-label", text: "Daily funds" }),
+        el("span", { className: "dash-text", text: summary }),
+        el("span", { className: "dash-sub", text: meta }),
+        el("div", { className: "funds-bar", attrs: { "aria-hidden": "true" } }, [
+          el("span", {
+            className: "funds-bar-fill",
+            attrs: { style: "inline-size:" + Math.round(ratio * 100) + "%" },
+          }),
+        ]),
+      ]
+    );
+  }
+
+  function appTiles() {
+    return APP_TILES.map((tile) =>
       el(
         "button",
         {
@@ -550,7 +657,19 @@
         ]
       )
     );
+  }
 
+  function renderHome() {
+    const now = new Date();
+    const tasks = tasksApi();
+    const data = tasks ? tasks.loadAndPersist() : null;
+    const current = data && tasks ? tasks.topUnfinished(data) : null;
+    const due = current && tasks && current.task.due ? tasks.formatDue(current.task.due, now) : "";
+    const funds = fundsApi() ? fundsApi().loadAndPersist() : null;
+    const next = loadNextUp();
+    const talk = lastTalkPreview();
+    const talkNameText = talk ? talkName(talk.to) : "Talk";
+    const talkBody = talk ? clipText(talk.text, 72) : "No messages yet";
     return screen(
       [
         el("header", { className: "screen-header hud-header" }, [
@@ -574,38 +693,279 @@
           el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
           el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
         ]),
-        el("div", { className: "content stack" }, [
+        el("div", { className: "content stack dash-stack" }, [
+          dashCard(
+            "open-current-task",
+            "Task",
+            current ? current.task.title : "No open tasks",
+            current ? current.list.name + (due ? " · " + due : "") : "Open Apps to add one",
+            () => {
+              if (current) {
+                navigate({ screen: "tasks", listId: current.list.id, taskId: current.task.id });
+                return;
+              }
+              navigate({ screen: "tasks" });
+            }
+          ),
+          renderFundsCard(funds),
+          dashCard(
+            "open-next-up",
+            "Next up",
+            next.text || "Set the next stream or shift",
+            next.text ? "Enter to change" : "Stored on this device",
+            () => navigate({ screen: "next-up", text: next.text || "" })
+          ),
+          dashCard(
+            "open-talk-preview",
+            talk ? talkNameText : "Talk",
+            talkBody,
+            talk ? "Last message" : "Open Talk to write one",
+            () => (talk ? openTalk(talk.to) : navigate({ screen: "talk-picker" })),
+            "talk-preview"
+          ),
+        ]),
+        el("div", { className: "footer hud-footer" }, [
           el(
             "button",
             {
               type: "button",
-              className: "next-up",
-              id: "next-up",
-              onClick: () => {
-                if (next) {
-                  navigate({
-                    screen: "tasks",
-                    listId: next.list.id,
-                    taskId: next.task.id,
-                  });
-                  return;
-                }
-                navigate({ screen: "tasks" });
-              },
+              className: "secondary",
+              id: "open-add-spend",
+              onClick: () => navigate({ screen: "funds-entry", amount: "", label: "" }),
             },
-            [
-              el("span", { className: "next-up-label", text: "Next up" }),
-              el("span", { className: "next-up-text" }, [
-                next ? next.task.title : "No open tasks",
-                next ? el("span", { className: "next-up-list", text: " · " + next.list.name }) : null,
-              ]),
-            ]
+            "Add spend"
           ),
-          el("div", { className: "tile-grid", attrs: { role: "list" } }, tiles),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary primary",
+              id: "open-apps",
+              onClick: () => navigate({ screen: "apps" }),
+            },
+            "Apps"
+          ),
         ]),
       ],
       "hud-home"
     );
+  }
+
+  function renderApps() {
+    return screen(
+      [
+        header("World Static", "Apps", "Arrow to a tile, then Enter"),
+        el("div", { className: "content stack" }, [
+          el("div", { className: "tile-grid", attrs: { role: "list" } }, appTiles()),
+        ]),
+        el("div", { className: "footer" }, [homeButton()]),
+      ],
+      "apps-screen"
+    );
+  }
+
+  function renderFundsEntry(state) {
+    const api = fundsApi();
+    const funds = api ? api.loadAndPersist() : null;
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const spentLine = funds ? "Today " + money(funds.spent) : "Kept on this device";
+    const notice = state && state.notice;
+    return screen(
+      [
+        header("Daily funds", "Add spend", spentLine),
+        el("div", { className: "content stack" }, [
+          notice
+            ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "error" } })
+            : null,
+          el("p", {
+            className: "hint",
+            text: "Type an amount and press Enter. It is added to today's total and stays on this device.",
+          }),
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "funds-amount", text: "Amount" }),
+            el("input", {
+              id: "funds-amount",
+              type: "search",
+              name: "funds-amount",
+              autocomplete: "off",
+              placeholder: "Amount, like 5",
+              value: (state && state.amount) || "",
+              attrs: { enterkeyhint: "done", inputmode: "decimal", spellcheck: "false" },
+            }),
+            el("label", { htmlFor: "funds-label", text: "Label (optional)" }),
+            el("input", {
+              id: "funds-label",
+              type: "search",
+              name: "funds-label",
+              autocomplete: "off",
+              placeholder: "What was it for?",
+              value: (state && state.label) || "",
+              attrs: { enterkeyhint: "done", spellcheck: "true" },
+            }),
+          ]),
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            { type: "button", className: "secondary primary", id: "save-funds-spend", onClick: submitAddSpend },
+            "Save"
+          ),
+          homeButton(),
+        ]),
+      ],
+      "funds-entry-screen"
+    );
+  }
+
+  function renderFundsBudget(state) {
+    const api = fundsApi();
+    const funds = api ? api.loadAndPersist() : null;
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const notice = state && state.notice;
+    const spent = funds ? money(funds.spent) : "$0";
+    const left = funds && api ? money(api.remaining(funds)) : "$0";
+    const budgetValue =
+      state && state.budget != null && state.budget !== ""
+        ? String(state.budget)
+        : funds && funds.budget
+          ? String(funds.budget)
+          : "";
+    return screen(
+      [
+        header("Daily funds", "Budget", "Spent resets at midnight"),
+        el("div", { className: "content stack" }, [
+          el("p", { className: "hint", text: "Spent today " + spent + "  ·  Left " + left }),
+          notice
+            ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "error" } })
+            : null,
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "funds-budget", text: "Daily budget" }),
+            el("input", {
+              id: "funds-budget",
+              type: "search",
+              name: "funds-budget",
+              autocomplete: "off",
+              placeholder: "Daily budget, like 40",
+              value: budgetValue,
+              attrs: { enterkeyhint: "done", inputmode: "decimal", spellcheck: "false" },
+            }),
+          ]),
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            { type: "button", className: "secondary primary", id: "save-funds-budget", onClick: submitFundsBudget },
+            "Save"
+          ),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary",
+              id: "funds-budget-add",
+              onClick: () => navigate({ screen: "funds-entry", amount: "", label: "" }),
+            },
+            "Add spend"
+          ),
+          homeButton(),
+        ]),
+      ],
+      "funds-budget-screen"
+    );
+  }
+
+  function renderNextUpEditor(state) {
+    const current = loadNextUp();
+    const value = state && state.text != null ? state.text : current.text;
+    const notice = state && state.notice;
+    return screen(
+      [
+        header("World Static", "Next up", "Stored on this device"),
+        el("div", { className: "content stack" }, [
+          notice
+            ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } })
+            : null,
+          el("p", { className: "hint", text: "One line for the next stream, shift, or plan." }),
+          el("div", { className: "field-wrap stack" }, [
+            el("label", { htmlFor: "next-up-text", text: "Next up" }),
+            el("input", {
+              id: "next-up-text",
+              type: "search",
+              name: "next-up-text",
+              autocomplete: "off",
+              placeholder: "Next stream or shift",
+              value: value || "",
+              attrs: { enterkeyhint: "done", spellcheck: "true", maxlength: String(NEXT_UP_MAX) },
+            }),
+          ]),
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            { type: "button", className: "secondary primary", id: "save-next-up", onClick: saveNextUpFromForm },
+            "Save"
+          ),
+          el(
+            "button",
+            { type: "button", className: "secondary", id: "clear-next-up", onClick: clearNextUpFromForm },
+            "Clear"
+          ),
+          homeButton(),
+        ]),
+      ],
+      "next-up-screen"
+    );
+  }
+
+  function submitAddSpend() {
+    const api = fundsApi();
+    const amount = ((document.getElementById("funds-amount") || {}).value || "").trim();
+    const label = ((document.getElementById("funds-label") || {}).value || "").trim();
+    if (!api) {
+      navigate({ screen: "funds-entry", amount, label, notice: "Funds could not load.", noticeKind: "error" }, { push: false });
+      return;
+    }
+    const result = api.addSpend(api.loadAndPersist(), amount, label);
+    if (!result.ok) {
+      navigate(
+        { screen: "funds-entry", amount, label, notice: result.message, noticeKind: "error" },
+        { push: false }
+      );
+      return;
+    }
+    api.save(result.data);
+    navigate(HOME_STATE, { push: false });
+  }
+
+  function submitFundsBudget() {
+    const api = fundsApi();
+    const budget = ((document.getElementById("funds-budget") || {}).value || "").trim();
+    if (!api) {
+      navigate({ screen: "funds-budget", budget, notice: "Funds could not load.", noticeKind: "error" }, { push: false });
+      return;
+    }
+    const result = api.setBudget(api.loadAndPersist(), budget);
+    if (!result.ok) {
+      navigate(
+        { screen: "funds-budget", budget, notice: result.message, noticeKind: "error" },
+        { push: false }
+      );
+      return;
+    }
+    api.save(result.data);
+    navigate(HOME_STATE, { push: false });
+  }
+
+  function saveNextUpFromForm() {
+    const input = document.getElementById("next-up-text");
+    const text = input && input.value ? input.value : "";
+    saveNextUp(text);
+    navigate(HOME_STATE, { push: false });
+  }
+
+  function clearNextUpFromForm() {
+    clearNextUp();
+    navigate({ screen: "next-up", text: "", notice: "Cleared.", noticeKind: "ok" }, { push: false });
   }
 
   function renderComingSoon(state) {
@@ -4000,9 +4360,25 @@
         view = renderPrompterPlay(state);
         lastFocusSelector = "#go-back";
         break;
+      case "apps":
+        view = renderApps();
+        lastFocusSelector = "#open-task-cards";
+        break;
+      case "funds-entry":
+        view = renderFundsEntry(state);
+        lastFocusSelector = "#funds-amount";
+        break;
+      case "funds-budget":
+        view = renderFundsBudget(state);
+        lastFocusSelector = "#funds-budget";
+        break;
+      case "next-up":
+        view = renderNextUpEditor(state);
+        lastFocusSelector = "#next-up-text";
+        break;
       default:
         view = renderHome();
-        lastFocusSelector = "#open-task-cards";
+        lastFocusSelector = "#open-apps";
     }
     app.append(view);
     if (screenName === "home") startClock();
@@ -4142,6 +4518,26 @@
     if (event.key === "Enter" && event.target && event.target.id === "major-message") {
       event.preventDefault();
       submitMajorMessage();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "funds-amount") {
+      event.preventDefault();
+      submitAddSpend();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "funds-label") {
+      event.preventDefault();
+      submitAddSpend();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "funds-budget") {
+      event.preventDefault();
+      submitFundsBudget();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "next-up-text") {
+      event.preventDefault();
+      saveNextUpFromForm();
       return;
     }
     if (event.key === "Enter" && event.target && event.target.id === "task-title") {

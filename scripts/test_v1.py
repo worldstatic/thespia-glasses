@@ -151,6 +151,42 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("styles.css missing kind-toggle rules")
     if 'if (relayUrl && token) kind = "relay"' not in js and "if (relayUrl && token) kind = \"relay\"" not in js:
         failures.append("Talk Settings must auto-enable live relay when URL and token are set")
+    if "open-apps" not in js or "function renderApps(" not in js:
+        failures.append("Apps screen missing from app.js")
+    if "open-add-spend" not in js or "funds-amount" not in js:
+        failures.append("Add spend path or amount field missing")
+    funds_src = (ROOT / "funds.js").read_text(encoding="utf-8")
+    if "thespia.hud.funds" not in funds_src or "function addSpend(" not in funds_src or "function rollover(" not in funds_src:
+        failures.append("funds.js missing storage key, addSpend, or rollover")
+    if "WorldStaticFunds" not in js or "submitAddSpend" not in js:
+        failures.append("app.js must use the funds module and save a spend")
+    if "thespia.hud.nextup" not in js:
+        failures.append("Next up schedule key missing from app.js")
+    if "open-current-task" not in js or "Daily funds" not in js or "lastTalkPreview" not in js:
+        failures.append("home dashboard is missing the task, funds, or last Talk line")
+    home_fn = extract_js_function(js, "renderHome")
+    if "tile-grid" in home_fn or "APP_TILES.map" in home_fn:
+        failures.append("home screen must not render the app tile grid")
+    if "open-apps" not in home_fn or "open-add-spend" not in home_fn:
+        failures.append("home screen must include Apps and Add spend buttons")
+    apps_fn = extract_js_function(js, "renderApps")
+    tiles_fn = extract_js_function(js, "appTiles")
+    if "tile-grid" not in apps_fn or "appTiles()" not in apps_fn:
+        failures.append("Apps screen must list the app tiles")
+    if "open-task-cards" not in tiles_fn and "open-task-cards" not in js:
+        failures.append("Apps tiles must still include Task Cards")
+    if "go-home" not in apps_fn and "homeButton()" not in apps_fn:
+        failures.append("Apps screen must have a way back to Home")
+    if "hud-bg.png" not in css:
+        failures.append("styles.css missing HUD background art")
+    if "funds.js" not in html:
+        failures.append("index.html must load funds.js")
+    if 'id: "funds-amount"' in js:
+        idx = js.find('id: "funds-amount"')
+        window = js[idx: idx + 280]
+        if 'type: "search"' not in window:
+            failures.append("funds-amount must use type=search")
+
     if "speechSynthesis" not in js or "ArrowLeft" not in js:
         failures.append("input or TTS hooks missing")
     if "thespia.hud.favorites" not in js:
@@ -424,10 +460,12 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v10" not in sw and "${CACHE_PREFIX}v10" not in sw:
-        failures.append("service worker cache version should be v10")
+    if "thespia-blueprint-help-v11" not in sw and "${CACHE_PREFIX}v11" not in sw:
+        failures.append("service worker cache version should be v11")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
+    if "funds.js" not in sw or "hud-bg.png" not in sw:
+        failures.append("service worker must precache funds.js and the HUD background")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -913,6 +951,18 @@ def main() -> int:
         out = (thread_test.stdout or "") + (thread_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"talk-threads: {line}")
+
+    funds_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_funds.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if funds_test.returncode != 0:
+        failures.append("daily funds tests failed")
+        out = (funds_test.stdout or "") + (funds_test.stderr or "")
+        for line in out.strip().splitlines()[-12:]:
+            failures.append(f"funds: {line}")
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],
