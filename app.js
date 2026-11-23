@@ -16,6 +16,15 @@
 
   const APP_TILES = [
     {
+      id: "funds",
+      title: "Add spend",
+      sub: "Log today's total",
+      screen: "funds-entry",
+      available: true,
+      buttonId: "open-add-spend",
+      icon: "funds",
+    },
+    {
       id: "tasks",
       title: "Task Cards",
       sub: "Work, home, and projects",
@@ -607,7 +616,7 @@
     );
   }
 
-  function renderFundsCard(funds) {
+  function fundsBadge(funds) {
     const api = fundsApi();
     const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
     const budget = funds ? Number(funds.budget) || 0 : 0;
@@ -615,26 +624,74 @@
     const left = api && funds ? api.remaining(funds) : 0;
     const ratio = api && funds ? api.spentRatio(funds) : 0;
     const over = left < 0;
-    const summary = budget ? "Spent " + money(spent) + "  ·  Left " + money(left) : "Set a daily budget";
-    const meta = budget ? "Budget " + money(budget) : "Kept on this device";
+    const leftText = budget ? "Left " + money(left) : "Set budget";
+    const spentText = budget ? "Spent " + money(spent) : "Daily funds";
     return el(
       "button",
       {
         type: "button",
-        className: over ? "dash-card funds-card over" : "dash-card funds-card",
+        className: over ? "funds-badge over" : "funds-badge",
         id: "open-funds",
         onClick: () => navigate({ screen: "funds-budget" }),
+        attrs: {
+          "aria-label": budget ? leftText + ", " + spentText : "Set a daily budget",
+        },
       },
       [
-        el("span", { className: "dash-label", text: "Daily funds" }),
-        el("span", { className: "dash-text", text: summary }),
-        el("span", { className: "dash-sub", text: meta }),
-        el("div", { className: "funds-bar", attrs: { "aria-hidden": "true" } }, [
-          el("span", {
-            className: "funds-bar-fill",
-            attrs: { style: "inline-size:" + Math.round(ratio * 100) + "%" },
-          }),
+        strokeIcon("funds"),
+        el("div", { className: "funds-badge-copy" }, [
+          el("span", { className: "funds-badge-left", text: leftText }),
+          el("span", { className: "funds-badge-spent", text: spentText }),
+          el("div", { className: "funds-bar funds-bar-tiny", attrs: { "aria-hidden": "true" } }, [
+            el("span", {
+              className: "funds-bar-fill",
+              attrs: { style: "inline-size:" + Math.round(ratio * 100) + "%" },
+            }),
+          ]),
         ]),
+      ]
+    );
+  }
+
+  function renderTaskCard(current, due) {
+    const tasks = tasksApi();
+    const items = current && tasks && typeof tasks.openChecklistItems === "function"
+      ? tasks.openChecklistItems(current.task)
+      : [];
+    const shown = items.slice(0, 3);
+    const more = Math.max(0, items.length - shown.length);
+    return el(
+      "button",
+      {
+        type: "button",
+        className: "dash-card task-dash",
+        id: "open-current-task",
+        onClick: () => {
+          if (current) {
+            navigate({ screen: "tasks", listId: current.list.id, taskId: current.task.id });
+            return;
+          }
+          navigate({ screen: "tasks" });
+        },
+      },
+      [
+        el("span", { className: "dash-label", text: "Task" }),
+        el("span", { className: "dash-text", text: current ? current.task.title : "No open tasks" }),
+        shown.length
+          ? el(
+              "ul",
+              { className: "dash-bullets" },
+              shown.map((item) => el("li", { text: item.text }))
+            )
+          : null,
+        more ? el("p", { className: "dash-more", text: "+" + more + " more" }) : null,
+        el(
+          "span",
+          {
+            className: "dash-sub",
+            text: current ? current.list.name + (due ? " · " + due : "") : "Open Apps to add one",
+          }
+        ),
       ]
     );
   }
@@ -673,41 +730,15 @@
     return screen(
       [
         el("header", { className: "screen-header hud-header" }, [
-          el("div", { className: "brand-row" }, [
-            el("img", {
-              className: "brand-logo",
-              src: "./icons/logo.svg",
-              alt: "",
-              width: 28,
-              height: 28,
-              attrs: { "aria-hidden": "true" },
-            }),
-            el("p", {
-              className: "wordmark",
-              id: "wordmark",
-              dataset: { text: "World Static" },
-              text: "World Static",
-              attrs: { "aria-label": "World Static" },
-            }),
+          el("div", { className: "hud-top" }, [
+            el("div", { className: "hud-time-col" }, [
+              el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
+              el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
+            ]),
+            fundsBadge(funds),
           ]),
-          el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
-          el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
         ]),
         el("div", { className: "content stack dash-stack" }, [
-          dashCard(
-            "open-current-task",
-            "Task",
-            current ? current.task.title : "No open tasks",
-            current ? current.list.name + (due ? " · " + due : "") : "Open Apps to add one",
-            () => {
-              if (current) {
-                navigate({ screen: "tasks", listId: current.list.id, taskId: current.task.id });
-                return;
-              }
-              navigate({ screen: "tasks" });
-            }
-          ),
-          renderFundsCard(funds),
           dashCard(
             "open-next-up",
             "Next up",
@@ -715,6 +746,7 @@
             next.text ? "Enter to change" : "Stored on this device",
             () => navigate({ screen: "next-up", text: next.text || "" })
           ),
+          renderTaskCard(current, due),
           dashCard(
             "open-talk-preview",
             talk ? talkNameText : "Talk",
@@ -725,16 +757,6 @@
           ),
         ]),
         el("div", { className: "footer hud-footer" }, [
-          el(
-            "button",
-            {
-              type: "button",
-              className: "secondary",
-              id: "open-add-spend",
-              onClick: () => navigate({ screen: "funds-entry", amount: "", label: "" }),
-            },
-            "Add spend"
-          ),
           el(
             "button",
             {
@@ -3164,6 +3186,11 @@
     ],
     scan: ["M12 4l8 4.5v7L12 20l-8-4.5v-7z", "M12 20v-7.5", "M4 8.5l8 4 8-4"],
     overlock: ["M8 11V8.5a4 4 0 0 1 8 0V11", "M7 11h10v9H7z"],
+    funds: [
+      "M5 9.5l2-3h10l2 3",
+      "M4.5 9.5h15v9.2A1.8 1.8 0 0 1 17.7 20.5H6.3A1.8 1.8 0 0 1 4.5 18.7z",
+      { tag: "circle", cx: "16", cy: "14.8", r: "1.35" },
+    ],
   };
 
   function resolveTaskSelection(state) {
@@ -4362,7 +4389,7 @@
         break;
       case "apps":
         view = renderApps();
-        lastFocusSelector = "#open-task-cards";
+        lastFocusSelector = "#open-add-spend";
         break;
       case "funds-entry":
         view = renderFundsEntry(state);

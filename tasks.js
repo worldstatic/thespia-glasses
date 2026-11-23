@@ -8,6 +8,8 @@
   const TITLE_MAX = 80;
   const NOTE_MAX = 240;
   const NAME_MAX = 40;
+  const ITEM_MAX = 80;
+  const MAX_ITEMS = 20;
   const MAX_LISTS = 20;
   const MAX_TASKS_PER_LIST = 50;
 
@@ -18,7 +20,15 @@
   ];
 
   const SEED_TASKS = {
-    work: [{ title: "Review today's checklist" }],
+    work: [{
+      title: "Review today's checklist",
+      items: [
+        { text: "Check open cards" },
+        { text: "Clear finished ones" },
+        { text: "Set tomorrow's first task" },
+        { text: "Pack the stream bag" },
+      ],
+    }],
     home: [{ title: "Take out the recycling" }],
     projects: [{ title: "Sketch the next layout" }],
   };
@@ -177,6 +187,42 @@
     return formatShortDate(date);
   }
 
+  function normalizeItem(item) {
+    const text = String((item && (item.text || item.title)) || "").trim().slice(0, ITEM_MAX);
+    if (!text) return null;
+    return {
+      id: String((item && item.id) || newId("item")),
+      text,
+      done: Boolean(item && item.done),
+    };
+  }
+
+  function itemFromLine(line) {
+    let text = String(line || "").trim();
+    if (!text) return null;
+    text = text.replace(/^(?:[-*•]|\d+[.)])\s+/, "");
+    let done = false;
+    const box = text.match(/^\[(x|X| )\]\s*(.*)$/);
+    if (box) {
+      done = box[1].toLowerCase() === "x";
+      text = box[2];
+    }
+    text = text.trim();
+    if (!text) return null;
+    return { text: text.slice(0, ITEM_MAX), done };
+  }
+
+  function itemsFromNote(note) {
+    const lines = String(note || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (!lines.length) return [];
+    const looksLikeList = lines.length > 1 || /^(?:[-*•]|\d+[.)]|\[[ xX]\])/i.test(lines[0]);
+    if (!looksLikeList) return [];
+    return lines.map(itemFromLine).filter(Boolean).slice(0, MAX_ITEMS);
+  }
+
   function normalizeTask(item) {
     if (!item) return null;
     const title = String(item.title || "").trim().slice(0, TITLE_MAX);
@@ -190,13 +236,26 @@
         if (parsed.ok && parsed.due) due = parsed.due;
       }
     }
+    const rawItems = Array.isArray(item.items)
+      ? item.items
+      : Array.isArray(item.checklist)
+        ? item.checklist
+        : [];
+    let items = rawItems.map(normalizeItem).filter(Boolean);
+    if (!items.length) items = itemsFromNote(item.note).map(normalizeItem).filter(Boolean);
     return {
       id: String(item.id || newId("task")),
       title,
       note: String(item.note || "").trim().slice(0, NOTE_MAX),
       done: Boolean(item.done),
       due,
+      items: items.slice(0, MAX_ITEMS),
     };
+  }
+
+  function openChecklistItems(task) {
+    if (!task || !Array.isArray(task.items)) return [];
+    return task.items.filter((item) => item && item.text && !item.done);
   }
 
   function normalizeList(item) {
@@ -219,7 +278,7 @@
     const data = emptyData();
     for (const list of data.lists) {
       const seeds = SEED_TASKS[list.id] || [];
-      list.tasks = seeds.map((item) => normalizeTask({ title: item.title, note: item.note || "", due: item.due || null, id: newId("task") }));
+      list.tasks = seeds.map((item) => normalizeTask({ ...item, id: newId("task") }));
     }
     return data;
   }
@@ -450,6 +509,10 @@
     TITLE_MAX,
     NOTE_MAX,
     NAME_MAX,
+    ITEM_MAX,
+    normalizeItem,
+    itemsFromNote,
+    openChecklistItems,
     DEFAULT_LIST_SPECS,
     parseDue,
     formatDue,

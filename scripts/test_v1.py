@@ -32,7 +32,6 @@ def fetch(path: str, method: str = "GET", data: bytes | None = None, timeout: in
 def check_home_and_major(js: str, css: str, html: str, transport: str, failures: list[str]) -> None:
     for needle in (
         "World Static",
-        "wordmark",
         "hud-clock",
         "hud-date",
         "Next up",
@@ -64,8 +63,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("app.js still has the Photo to Texture tile")
     if 'id: "texture"' in js or "icon: \"texture\"" in js:
         failures.append("app.js still has Photo to Texture placeholder code")
-    if "logo.svg" not in js or "brand-logo" not in js:
-        failures.append("app.js missing World Static logo on the home header")
+    if "logo.svg" not in html or "boot-logo" not in html:
+        failures.append("index.html splash should show the World Static logo")
     logo = ROOT / "icons/logo.svg"
     if not logo.is_file():
         failures.append("icons/logo.svg is missing")
@@ -162,17 +161,30 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("app.js must use the funds module and save a spend")
     if "thespia.hud.nextup" not in js:
         failures.append("Next up schedule key missing from app.js")
-    if "open-current-task" not in js or "Daily funds" not in js or "lastTalkPreview" not in js:
-        failures.append("home dashboard is missing the task, funds, or last Talk line")
+    if "open-current-task" not in js or "fundsBadge" not in js or "lastTalkPreview" not in js:
+        failures.append("home dashboard is missing the task, funds badge, or last Talk line")
+    if "openChecklistItems" not in js or "dash-bullets" not in js or "dash-more" not in js:
+        failures.append("Task card must show uncompleted checklist bullets")
+    if ".funds-badge" not in css or ".dash-bullets" not in css:
+        failures.append("styles.css missing funds badge or task bullet rules")
     home_fn = extract_js_function(js, "renderHome")
     if "tile-grid" in home_fn or "APP_TILES.map" in home_fn:
         failures.append("home screen must not render the app tile grid")
-    if "open-apps" not in home_fn or "open-add-spend" not in home_fn:
-        failures.append("home screen must include Apps and Add spend buttons")
+    if "wordmark" in home_fn or "brand-logo" in home_fn:
+        failures.append("home screen must not show the World Static logo header")
+    if "open-add-spend" in home_fn:
+        failures.append("Add spend must not be a home footer button")
+    if "open-apps" not in home_fn or "open-next-up" not in home_fn or "fundsBadge" not in home_fn:
+        failures.append("home screen must include Apps, Next up, and the funds badge")
+    # Next up should be the first dash card under the date.
+    if "renderTaskCard" not in home_fn or home_fn.find("open-next-up") > home_fn.find("renderTaskCard"):
+        failures.append("Next up should sit above the Task card")
     apps_fn = extract_js_function(js, "renderApps")
     tiles_fn = extract_js_function(js, "appTiles")
     if "tile-grid" not in apps_fn or "appTiles()" not in apps_fn:
         failures.append("Apps screen must list the app tiles")
+    if "open-add-spend" not in tiles_fn and 'buttonId: "open-add-spend"' not in js:
+        failures.append("Add spend must be a tile on the Apps screen")
     if "open-task-cards" not in tiles_fn and "open-task-cards" not in js:
         failures.append("Apps tiles must still include Task Cards")
     if "go-home" not in apps_fn and "homeButton()" not in apps_fn:
@@ -460,8 +472,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v11" not in sw and "${CACHE_PREFIX}v11" not in sw:
-        failures.append("service worker cache version should be v11")
+    if "thespia-blueprint-help-v12" not in sw and "${CACHE_PREFIX}v12" not in sw:
+        failures.append("service worker cache version should be v12")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
@@ -695,6 +707,7 @@ def check_task_cards(js: str, css: str, html: str, sw: str, failures: list[str])
         "thespia.hud.tasks",
         "function parseDue(",
         "function topUnfinished(",
+        "function openChecklistItems(",
         "function clearDone(",
         "function exportBlob(",
         "function importBlob(",
@@ -808,6 +821,10 @@ const localStorage = {{
 let data = T.loadAndPersist(localStorage);
 assert(data.lists.map((list) => list.name).join(",") === "Work,Home,Projects", "default lists");
 assert(T.topUnfinished(data).task.title === "Review today's checklist", "seeded next up");
+assert(T.openChecklistItems(T.topUnfinished(data).task).length === 4, "seeded checklist items");
+const listed = T.normalizeTask({{ title: "Prep", note: ["- One", "- Two", "- [x] Done", "- Three", "- Four"].join("\\n") }});
+assert(listed.items.length === 5, "note bullets");
+assert(T.openChecklistItems(listed).map((item) => item.text).join(",") === "One,Two,Three,Four", "open bullets skip done");
 const added = T.addTask(data, "work", {{ title: "Ship the build", due: "2026-11-22" }});
 assert(added.ok, "add task");
 assert(T.topUnfinished(data).task.title === "Ship the build", "earliest due is next");

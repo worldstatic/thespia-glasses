@@ -35,14 +35,13 @@ That command also runs the privacy scan (`scripts/privacy_scan.py`).
 The app opens to a glanceable **World Static** dashboard (no app tiles on home):
 
 - A dim, outline-treated crop of Thespia campaign art (the colony quarters with a cyan ore vein and a viewport to the chained hulls) sits behind the UI. It is darkened for the additive 600×600 display, where black reads as transparent, so the clock and cards stay readable. The source is official Thespia concept art already made for the game — no people, no workplace photos, and no personal information
-- The World Static logo and wordmark, a large clock, and the date, updated on the device
-- The current **Task** card from your Task Cards data (soonest due day first). Open it to jump to that task
-- **Daily funds**: today's budget, spent, and remaining, with a simple bar. **Add spend** is on the home footer: type an amount in a `type=search` field and press Enter to add it to the running total. You can set the budget from the funds card. Spent resets at local midnight; a short history stays on the device. Nothing is sent anywhere
-- **Next up**: one schedule line you set (the next stream or shift), stored in `localStorage`
+- A large clock and the date, with a compact **Daily funds** badge beside them (left today, spent, and a tiny bar). Open the badge to set the budget. Spent resets at local midnight; a short history stays on the device. Nothing is sent anywhere
+- **Next up**, directly under the date: one schedule line you set (the next stream or shift), stored in `localStorage`
+- The current **Task** card from your Task Cards data (soonest due day first), with up to three uncompleted checklist bullets and “+N more” if needed. Open it to jump to that task
 - A short line with the last message from Major or C 2
 - One primary **Apps** button
 
-App tiles live on a separate **Apps** screen: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
+App tiles live on a separate **Apps** screen. **Add spend** is there: type an amount in a `type=search` field and press Enter to add it to today's running total. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
 
 ## Task Cards
 

@@ -375,7 +375,100 @@ input::placeholder {
 }
 
 .hud-header {
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.45rem;
+}
+
+.hud-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.hud-time-col {
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+button.funds-badge {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  inline-size: auto;
+  max-inline-size: 11.6rem;
+  min-block-size: 0;
+  padding: 0.35rem 0.5rem 0.4rem;
+  background: #000;
+  border: 1px solid rgba(126, 224, 255, 0.45);
+  border-radius: 0.65rem;
+  text-align: left;
+}
+
+button.funds-badge:focus,
+button.funds-badge:focus-visible {
+  border-color: #7ee0ff;
+  box-shadow: 0 0 12px rgba(126, 224, 255, 0.32);
+}
+
+button.funds-badge .tile-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: #7ee0ff;
+}
+
+.funds-badge-copy {
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+.funds-badge-left {
+  display: block;
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.15;
+}
+
+.funds-badge-spent {
+  display: block;
+  margin-top: 0.06rem;
+  color: #bdbdbd;
+  font-size: 0.72rem;
+}
+
+.funds-bar-tiny {
+  margin-top: 0.26rem;
+  block-size: 0.32rem;
+}
+
+button.funds-badge.over {
+  border-color: rgba(255, 180, 180, 0.55);
+}
+
+button.funds-badge.over .funds-bar {
+  border-color: #ffb4b4;
+}
+
+button.funds-badge.over .funds-bar-fill {
+  box-shadow: inset 0 0 0 1px #ffb4b4;
+}
+
+.dash-bullets {
+  margin: 0.25rem 0 0;
+  padding: 0 0 0 1.1rem;
+}
+
+.dash-bullets li {
+  margin: 0;
+  color: #e8e8e8;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.dash-more {
+  margin: 0.16rem 0 0;
+  color: #8d8d8d;
+  font-size: 0.75rem;
 }
 
 .brand-row {
