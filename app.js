@@ -1,4 +1,4 @@
-/* Thespia HUD / Blueprint Help
+/* World Static — home, Blueprint Help, Task Cards, Teleprompter, Scale Check, Talk to Major
    Meta Ray-Ban Display Web App. Directional input arrives as Arrow keys + Enter.
    Web Apps cannot use the microphone; text fields open the on-glasses composer
    (handwriting, dictation, keyboard) on firmware v127+ / Meta AI app v272+.
@@ -9,12 +9,28 @@
 
   const HOME_STATE = { screen: "home" };
   const FAVORITES_KEY = "thespia.hud.favorites";
-  const NEXT_UP_KEY = "thespia.hud.nextUp";
   const API_ASK = "./api/ask";
   const API_HEALTH = "./api/health";
-  const NEXT_UP_MAX = 120;
 
   const APP_TILES = [
+    {
+      id: "tasks",
+      title: "Task Cards",
+      sub: "Work, home, and projects",
+      screen: "tasks",
+      available: true,
+      buttonId: "open-task-cards",
+      icon: "tasks",
+    },
+    {
+      id: "prompter",
+      title: "Teleprompter",
+      sub: "Stream scripts",
+      screen: "prompter",
+      available: true,
+      buttonId: "open-teleprompter",
+      icon: "prompter",
+    },
     {
       id: "blueprint",
       title: "Blueprint Help",
@@ -22,6 +38,16 @@
       screen: "help",
       available: true,
       buttonId: "open-blueprint-help",
+      icon: "blueprint",
+    },
+    {
+      id: "scale",
+      title: "Scale Check",
+      sub: "Real size in UE units",
+      screen: "scale",
+      available: true,
+      buttonId: "open-scale-check",
+      icon: "scale",
     },
     {
       id: "major",
@@ -30,18 +56,11 @@
       screen: "major",
       available: true,
       buttonId: "open-talk-to-major",
+      icon: "major",
     },
-    { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false },
-    { id: "texture", title: "Photo to Texture", sub: "Coming soon", available: false },
-    {
-      id: "scale",
-      title: "Scale Check",
-      sub: "Real size in UE units",
-      screen: "scale",
-      available: true,
-      buttonId: "open-scale-check",
-    },
-    { id: "scan", title: "3D Scan", sub: "Coming soon", available: false },
+    { id: "texture", title: "Photo to Texture", sub: "Coming soon", available: false, icon: "texture" },
+    { id: "scan", title: "3D Scan", sub: "Coming soon", available: false, icon: "scan" },
+    { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false, icon: "overlock" },
   ];
 
   const app = document.getElementById("app");
@@ -54,6 +73,8 @@
   let aiConfigured = false;
   let lastFocusSelector = null;
   let clockTimer = null;
+  let prompterRaf = null;
+  let prompterPlay = null;
 
   if (previewHint) previewHint.hidden = false;
 
@@ -294,27 +315,6 @@
     );
   }
 
-  function loadNextUp() {
-    try {
-      const raw = localStorage.getItem(NEXT_UP_KEY);
-      return raw ? String(raw).trim().slice(0, NEXT_UP_MAX) : "";
-    } catch (err) {
-      return "";
-    }
-  }
-
-  function saveNextUp(text) {
-    const value = String(text || "").trim().slice(0, NEXT_UP_MAX);
-    try {
-      if (value) localStorage.setItem(NEXT_UP_KEY, value);
-      else localStorage.removeItem(NEXT_UP_KEY);
-      return true;
-    } catch (err) {
-      console.warn("Could not save Next up on this device.");
-      return false;
-    }
-  }
-
   function recipeById(id) {
     return library && library.recipes ? library.recipes.find((r) => r.id === id) : null;
   }
@@ -521,23 +521,30 @@
       navigate({ screen: "major", cardIndex: 0, cards: [], query: "" });
       return;
     }
+    if (tile.screen === "tasks") {
+      navigate({ screen: "tasks", listId: null, taskIndex: 0 });
+      return;
+    }
     navigate({ screen: tile.screen });
   }
 
   function renderHome() {
     const now = new Date();
-    const nextUp = loadNextUp();
+    const api = tasksApi();
+    const data = api ? api.loadAndPersist() : null;
+    const next = data && api ? api.topUnfinished(data) : null;
     const tiles = APP_TILES.map((tile) =>
       el(
         "button",
         {
           type: "button",
-          className: tile.available ? (tile.id === "blueprint" ? "tile primary" : "tile") : "tile soon",
+          className: tile.available ? "tile" : "tile soon",
           id: tile.buttonId || `open-${tile.id}`,
           dataset: { soon: tile.available ? "false" : "true" },
           onClick: () => openTile(tile),
         },
         [
+          strokeIcon(tile.icon || tile.id),
           el("span", { className: "tile-title", text: tile.title }),
           el("span", { className: "tile-sub", text: tile.sub }),
         ]
@@ -547,7 +554,13 @@
     return screen(
       [
         el("header", { className: "screen-header hud-header" }, [
-          el("p", { className: "eyebrow", text: "Thespia" }),
+          el("p", {
+            className: "wordmark",
+            id: "wordmark",
+            dataset: { text: "World Static" },
+            text: "World Static",
+            attrs: { "aria-label": "World Static" },
+          }),
           el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
           el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
         ]),
@@ -558,14 +571,24 @@
               type: "button",
               className: "next-up",
               id: "next-up",
-              onClick: () => navigate({ screen: "next-up", value: nextUp }),
+              onClick: () => {
+                if (next) {
+                  navigate({
+                    screen: "tasks",
+                    listId: next.list.id,
+                    taskId: next.task.id,
+                  });
+                  return;
+                }
+                navigate({ screen: "tasks" });
+              },
             },
             [
               el("span", { className: "next-up-label", text: "Next up" }),
-              el("span", {
-                className: "next-up-text",
-                text: nextUp || "Tap to set your next task",
-              }),
+              el("span", { className: "next-up-text" }, [
+                next ? next.task.title : "No open tasks",
+                next ? el("span", { className: "next-up-list", text: " · " + next.list.name }) : null,
+              ]),
             ]
           ),
           el("div", { className: "tile-grid", attrs: { role: "list" } }, tiles),
@@ -575,70 +598,15 @@
     );
   }
 
-  function renderNextUp(state) {
-    const value = state.value != null ? state.value : loadNextUp();
-    const notice = state.notice || "";
-    return screen([
-      header("Home", "Next up", "Saved on this device only"),
-      el("div", { className: "content stack" }, [
-        el("div", { className: "field-wrap stack" }, [
-          el("label", { htmlFor: "next-up-input", text: "What should show on your home screen?" }),
-          el("input", {
-            id: "next-up-input",
-            type: "search",
-            name: "next-up",
-            autocomplete: "off",
-            placeholder: "Write or speak a short task",
-            value,
-            attrs: { enterkeyhint: "done", maxlength: String(NEXT_UP_MAX), spellcheck: "true" },
-          }),
-          el("p", {
-            className: "hint",
-            text: "On glasses, activate this field to dictate. This stays in local storage on the device.",
-          }),
-        ]),
-        notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
-      ]),
-      el("div", { className: "footer" }, [
-        el("button", { type: "button", className: "secondary primary", id: "save-next-up", onClick: saveNextUpFromForm }, "Save"),
-        el("button", { type: "button", className: "secondary", onClick: clearNextUpFromForm }, "Clear"),
-        homeButton(),
-      ]),
-    ]);
-  }
-
-  function saveNextUpFromForm() {
-    const input = document.getElementById("next-up-input");
-    const value = input && input.value ? input.value.trim() : "";
-    const ok = saveNextUp(value);
-    navigate(
-      {
-        screen: "next-up",
-        value,
-        notice: ok ? (value ? "Saved on this device." : "Cleared.") : "Could not save on this device.",
-        noticeKind: ok ? "ok" : "error",
-      },
-      { push: false }
-    );
-    if (ok) {
-      setTimeout(() => navigate(HOME_STATE), 450);
-    }
-  }
-
-  function clearNextUpFromForm() {
-    saveNextUp("");
-    navigate({ screen: "next-up", value: "", notice: "Cleared.", noticeKind: "ok" }, { push: false });
-  }
-
   function renderComingSoon(state) {
     const title = state.title || "This app";
     return screen([
-      header("Thespia", title, "Coming soon"),
+      header("World Static", title, "Coming soon"),
       el("div", { className: "content stack" }, [
         el("article", { className: "card" }, [
           el("p", {
             className: "step-body",
-            text: `${title} is on the list, but it is not built yet. Blueprint Help, Talk to Major, and Scale Check are ready to try.`,
+            text: `${title} is on the list, but it is not built yet. Task Cards, the Teleprompter, Blueprint Help, Scale Check, and Talk to Major are ready to try.`,
           }),
         ]),
       ]),
@@ -698,7 +666,7 @@
 
     return screen(
       [
-        header("Thespia", "Talk to Major", status),
+        header("World Static", "Talk to Major", status),
         el("div", { className: "content stack" }, [
           panel,
           notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
@@ -1631,6 +1599,7 @@
           },
           "Import"
         ),
+        backButton(),
         homeButton(),
       ]),
     ]);
@@ -2393,9 +2362,1141 @@
     ]);
   }
 
+  function tasksApi() {
+    return window.WorldStaticTasks || null;
+  }
+
+  function prompterApi() {
+    return window.WorldStaticPrompter || null;
+  }
+
+  function loadTaskData() {
+    const api = tasksApi();
+    return api ? api.loadAndPersist() : { version: 1, lists: [] };
+  }
+
+  function persistTasks(data) {
+    const api = tasksApi();
+    if (!api) return false;
+    return Boolean(api.save(data).ok);
+  }
+
+  function loadPrompterData() {
+    const api = prompterApi();
+    return api ? api.loadAndPersist() : { version: 1, fontSize: 36, speed: 28, scripts: [] };
+  }
+
+  function persistPrompter(data) {
+    const api = prompterApi();
+    if (!api) return false;
+    return Boolean(api.save(data).ok);
+  }
+
+  function svgNode(tag, attrs, children) {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    if (attrs) {
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value != null && value !== false) node.setAttribute(key, String(value));
+      }
+    }
+    if (children) {
+      for (const child of children) {
+        if (child) node.append(child);
+      }
+    }
+    return node;
+  }
+
+  function strokeIcon(name) {
+    const shapes = TILE_ICON_SHAPES[name] || TILE_ICON_SHAPES.tasks;
+    const children = shapes.map((shape) => {
+      if (typeof shape === "string") {
+        return svgNode("path", {
+          d: shape,
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        });
+      }
+      return svgNode(shape.tag, {
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "1.5",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        ...shape,
+        tag: undefined,
+      });
+    });
+    return svgNode(
+      "svg",
+      {
+        class: "tile-icon",
+        viewBox: "0 0 24 24",
+        width: "20",
+        height: "20",
+        "aria-hidden": "true",
+        focusable: "false",
+      },
+      children
+    );
+  }
+
+  const TILE_ICON_SHAPES = {
+    tasks: ["M9 6h11", "M9 12h11", "M9 18h11", "M4.2 6.1l1.3 1.4 2.4-2.6", "M5 12h.01", "M5 18h.01"],
+    prompter: ["M5 5h14", "M5 10h14", "M5 15h10", "M8 19h8"],
+    blueprint: [
+      { tag: "circle", cx: "6.5", cy: "7.5", r: "2" },
+      { tag: "circle", cx: "17.5", cy: "7.5", r: "2" },
+      { tag: "circle", cx: "12", cy: "17", r: "2" },
+      "M8.3 8.8l2.4 6",
+      "M15.7 8.8l-2.4 6",
+    ],
+    scale: ["M4 8h16v8H4z", "M8 8v3", "M12 8v5", "M16 8v3", "M6 16v-2"],
+    major: [
+      "M5 7.5c0-1.4 1.3-2.5 3-2.5h8c1.7 0 3 1.1 3 2.5v5c0 1.4-1.3 2.5-3 2.5H11l-3.5 2.5V15H8c-1.7 0-3-1.1-3-2.5z",
+    ],
+    texture: ["M5 5h14v14H5z", "M5 12h14", "M12 5v14", "M5 8.5h14", "M5 15.5h14", "M8.5 5v14", "M15.5 5v14"],
+    scan: ["M12 4l8 4.5v7L12 20l-8-4.5v-7z", "M12 20v-7.5", "M4 8.5l8 4 8-4"],
+    overlock: ["M8 11V8.5a4 4 0 0 1 8 0V11", "M7 11h10v9H7z"],
+  };
+
+  function resolveTaskSelection(state) {
+    const api = tasksApi();
+    const data = loadTaskData();
+    const lists = data.lists || [];
+    if (!lists.length) return { data, lists, list: null, listIndex: 0, taskIndex: 0, tasks: [] };
+    let listIndex = lists.findIndex((list) => list.id === state.listId);
+    if (listIndex < 0) listIndex = 0;
+    const list = lists[listIndex];
+    const tasks = list.tasks || [];
+    let taskIndex = 0;
+    if (state.taskId) {
+      const found = tasks.findIndex((task) => task.id === state.taskId);
+      taskIndex = found >= 0 ? found : 0;
+    } else if (Number.isFinite(state.taskIndex)) {
+      taskIndex = state.taskIndex;
+    }
+    if (tasks.length) taskIndex = Math.max(0, Math.min(tasks.length - 1, taskIndex));
+    else taskIndex = 0;
+    return { api, data, lists, list, listIndex, taskIndex, tasks };
+  }
+
+  function showTasks(state, extra, { push = false } = {}) {
+    navigate(
+      {
+        screen: "tasks",
+        listId: state && state.listId,
+        taskIndex: state && state.taskIndex,
+        taskId: state && state.taskId,
+        notice: "",
+        noticeKind: "",
+        ...(extra || {}),
+      },
+      { push }
+    );
+  }
+
+  function shiftTaskList(state, direction) {
+    const sel = resolveTaskSelection(state);
+    if (sel.lists.length < 2) return;
+    const nextIndex = (sel.listIndex + direction + sel.lists.length) % sel.lists.length;
+    showTasks(state, { listId: sel.lists[nextIndex].id, taskIndex: 0, taskId: null });
+  }
+
+  function shiftTaskIndex(state, direction) {
+    const sel = resolveTaskSelection(state);
+    if (!sel.tasks.length) return;
+    const next = Math.max(0, Math.min(sel.tasks.length - 1, sel.taskIndex + direction));
+    if (next === sel.taskIndex) return;
+    showTasks(state, { listId: sel.list.id, taskIndex: next, taskId: sel.tasks[next].id });
+  }
+
+  function selectedTask(state) {
+    const sel = resolveTaskSelection(state);
+    return sel.tasks[sel.taskIndex] || null;
+  }
+
+  function toggleSelectedTask(state) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const task = sel.tasks[sel.taskIndex];
+    if (!api || !task) return;
+    api.toggleTask(sel.data, task.id);
+    persistTasks(sel.data);
+    showTasks(state, { listId: sel.list.id, taskId: task.id, taskIndex: sel.taskIndex });
+  }
+
+  function renderTasks(state) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const progress = sel.list && api ? api.progress(sel.list) : { done: 0, total: 0 };
+    const items = sel.tasks.length
+      ? sel.tasks.map((task, index) => {
+          const dueLabel = task.due && api ? api.formatDue(task.due) : "";
+          const overdue = Boolean(dueLabel && dueLabel.indexOf("Overdue") === 0);
+          return el(
+            "button",
+            {
+              type: "button",
+              className: "tile task-item" + (index === sel.taskIndex ? " is-selected" : "") + (task.done ? " is-done" : ""),
+              id: index === sel.taskIndex ? "selected-task" : undefined,
+              dataset: { taskId: task.id },
+              onClick: () => {
+                if (index === sel.taskIndex) toggleSelectedTask({ ...state, listId: sel.list.id, taskId: task.id, taskIndex: index });
+                else showTasks(state, { listId: sel.list.id, taskId: task.id, taskIndex: index });
+              },
+            },
+            [
+              el("span", { className: "tile-title" }, [
+                el("span", { className: "task-mark", text: task.done ? "✓" : "○" }),
+                task.title,
+              ]),
+              task.note ? el("span", { className: "tile-sub", text: task.note }) : null,
+              dueLabel
+                ? el("span", { className: "task-due" + (overdue ? " is-overdue" : ""), text: dueLabel })
+                : null,
+            ]
+          );
+        })
+      : [
+          el("article", { className: "card" }, [
+            el("p", { className: "step-body", text: "No tasks in this list yet. Choose New task to add one." }),
+          ]),
+        ];
+
+    return screen([
+      header("Task Cards", sel.list ? sel.list.name : "Tasks", progress.total ? `${progress.done} of ${progress.total} done` : "No tasks yet"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "task-switcher" }, [
+          el("span", { className: "task-switcher-hint", text: "Left / Right to change lists" }),
+        ]),
+        el("div", { className: "stack", attrs: { role: "list" } }, items),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "open-new-task", onClick: () => openTaskEditor(sel.list && sel.list.id) }, "New task"),
+        el("button", { type: "button", className: "secondary", id: "open-task-actions", onClick: () => openTaskActions(state) }, "Actions"),
+        el("button", { type: "button", className: "secondary", id: "open-task-lists", onClick: () => openTaskListMenu(state) }, "Lists"),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function openTaskActions(state) {
+    const sel = resolveTaskSelection(state);
+    if (!sel.tasks.length) {
+      showTasks(state, { notice: "Add a task first.", noticeKind: "error" });
+      return;
+    }
+    navigate(
+      {
+        screen: "tasks-actions",
+        listId: sel.list.id,
+        taskId: sel.tasks[sel.taskIndex].id,
+        taskIndex: sel.taskIndex,
+      },
+      { push: true }
+    );
+  }
+
+  function openTaskListMenu(state) {
+    const sel = resolveTaskSelection(state);
+    navigate(
+      { screen: "tasks-list-menu", listId: sel.list ? sel.list.id : null, taskIndex: sel.taskIndex, taskId: state.taskId },
+      { push: true }
+    );
+  }
+
+  function openTaskEditor(listId, task) {
+    navigate(
+      {
+        screen: "tasks-edit",
+        listId,
+        taskId: task ? task.id : "",
+        title: task ? task.title : "",
+        note: task ? task.note : "",
+        due: task ? task.due || "" : "",
+        notice: "",
+      },
+      { push: true }
+    );
+  }
+
+  function renderTaskActions(state) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const task = sel.tasks[sel.taskIndex];
+    if (!task) {
+      return screen([
+        header("Task Cards", "Actions", "No task selected"),
+        el("div", { className: "content" }, [el("p", { className: "status", text: "That task is gone." })]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ]);
+    }
+    return screen([
+      header("Task Cards", "Actions", task.title),
+      el("div", { className: "content stack" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile primary",
+            id: "toggle-task-done",
+            onClick: () => {
+              api.toggleTask(sel.data, task.id);
+              persistTasks(sel.data);
+              showTasks(state, { listId: sel.list.id, taskId: task.id });
+            },
+          },
+          [el("span", { className: "tile-title", text: task.done ? "Mark not done" : "Mark done" })]
+        ),
+        el("button", { type: "button", className: "tile", id: "edit-task", onClick: () => openTaskEditor(sel.list.id, task) }, [
+          el("span", { className: "tile-title", text: "Edit" }),
+          el("span", { className: "tile-sub", text: "Title, note, or due day" }),
+        ]),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "move-task-up",
+            onClick: () => {
+              api.moveTaskBy(sel.data, task.id, -1);
+              persistTasks(sel.data);
+              showTasks(state, { listId: sel.list.id, taskId: task.id });
+            },
+          },
+          [el("span", { className: "tile-title", text: "Move up" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "move-task-down",
+            onClick: () => {
+              api.moveTaskBy(sel.data, task.id, 1);
+              persistTasks(sel.data);
+              showTasks(state, { listId: sel.list.id, taskId: task.id });
+            },
+          },
+          [el("span", { className: "tile-title", text: "Move down" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "move-task-list",
+            onClick: () =>
+              navigate({ screen: "tasks-move", listId: sel.list.id, taskId: task.id, taskIndex: sel.taskIndex }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "Move to another list" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "delete-task",
+            onClick: () =>
+              navigate({ screen: "tasks-delete", listId: sel.list.id, taskId: task.id, kind: "task" }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "Delete" })]
+        ),
+      ]),
+      el("div", { className: "footer" }, [backButton(), homeButton()]),
+    ]);
+  }
+
+  function renderTaskMove(state) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const task = sel.tasks[sel.taskIndex];
+    const targets = sel.lists.filter((list) => !sel.list || list.id !== sel.list.id);
+    return screen([
+      header("Task Cards", "Move", task ? task.title : "Task"),
+      el("div", { className: "content stack" }, [
+        ...(targets.length
+          ? targets.map((list) =>
+              el(
+                "button",
+                {
+                  type: "button",
+                  className: "tile",
+                  onClick: () => {
+                    api.moveTask(sel.data, task.id, list.id);
+                    persistTasks(sel.data);
+                    showTasks(state, { listId: list.id, taskId: task.id, notice: `Moved to ${list.name}.`, noticeKind: "ok" });
+                  },
+                },
+                [el("span", { className: "tile-title", text: list.name })]
+              )
+            )
+          : [el("p", { className: "status", text: "There is no other list to move this to." })]),
+      ]),
+      el("div", { className: "footer" }, [backButton(), homeButton()]),
+    ]);
+  }
+
+  function renderTaskListMenu(state) {
+    const sel = resolveTaskSelection(state);
+    const doneCount = sel.list ? sel.list.tasks.filter((task) => task.done).length : 0;
+    return screen([
+      header("Task Cards", "Lists", sel.list ? sel.list.name : ""),
+      el("div", { className: "content stack" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "rename-task-list",
+            onClick: () =>
+              navigate({ screen: "tasks-list-name", mode: "rename", listId: sel.list && sel.list.id, name: sel.list ? sel.list.name : "" }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "Rename list" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "new-task-list",
+            onClick: () => navigate({ screen: "tasks-list-name", mode: "create", listId: sel.list && sel.list.id, name: "" }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "New list" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "clear-done-tasks",
+            onClick: () => {
+              const api = tasksApi();
+              const result = api.clearDone(sel.data, sel.list.id);
+              persistTasks(sel.data);
+              showTasks(state, {
+                listId: sel.list.id,
+                taskIndex: 0,
+                notice: result.removed ? `Cleared ${result.removed} done ${result.removed === 1 ? "task" : "tasks"}.` : "No done tasks to clear.",
+                noticeKind: "ok",
+              });
+            },
+          },
+          [
+            el("span", { className: "tile-title", text: "Clear done" }),
+            el("span", { className: "tile-sub", text: doneCount ? `${doneCount} can be cleared` : "None done in this list" }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-task-backup",
+            onClick: () => navigate({ screen: "tasks-backup" }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "Export / Import" }), el("span", { className: "tile-sub", text: "JSON backup of your lists" })]
+        ),
+        sel.lists.length > 1
+          ? el(
+              "button",
+              {
+                type: "button",
+                className: "tile",
+                id: "delete-task-list",
+                onClick: () =>
+                  navigate({ screen: "tasks-delete", kind: "list", listId: sel.list.id }, { push: false }),
+              },
+              [el("span", { className: "tile-title", text: "Delete list" })]
+            )
+          : null,
+      ]),
+      el("div", { className: "footer" }, [backButton(), homeButton()]),
+    ]);
+  }
+
+  function renderTaskListName(state) {
+    const mode = state.mode === "rename" ? "rename" : "create";
+    const value = state.name != null ? state.name : "";
+    return screen([
+      header("Task Cards", mode === "rename" ? "Rename list" : "New list", "Saved on this device only"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "task-list-name", text: "List name" }),
+          el("input", {
+            id: "task-list-name",
+            type: "search",
+            name: "task-list-name",
+            autocomplete: "off",
+            placeholder: "Work, Home, or a project name",
+            value,
+            attrs: { enterkeyhint: "done", maxlength: "40", spellcheck: "true" },
+          }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "save-task-list-name", onClick: saveTaskListName }, "Save"),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function saveTaskListName() {
+    const api = tasksApi();
+    const state = currentState();
+    const input = document.getElementById("task-list-name");
+    const name = input && input.value ? input.value : "";
+    const data = loadTaskData();
+    const result = state.mode === "rename" ? api.renameList(data, state.listId, name) : api.addList(data, name);
+    if (!result.ok) {
+      navigate({ ...state, name, notice: result.message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    persistTasks(data);
+    showTasks(state, { listId: result.list.id, taskIndex: 0, notice: "Saved on this device.", noticeKind: "ok" });
+  }
+
+  function renderTaskEditor(state) {
+    return screen([
+      header("Task Cards", state.taskId ? "Edit task" : "New task", "Dictate or type, then save"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "task-title", text: "Title" }),
+          el("input", {
+            id: "task-title",
+            type: "search",
+            name: "task-title",
+            autocomplete: "off",
+            placeholder: "What needs doing?",
+            value: state.title || "",
+            attrs: { enterkeyhint: "next", maxlength: "80", spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "task-note", text: "Note (optional)" }),
+          el("input", {
+            id: "task-note",
+            type: "search",
+            name: "task-note",
+            autocomplete: "off",
+            placeholder: "A short note",
+            value: state.note || "",
+            attrs: { enterkeyhint: "next", maxlength: "240", spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "task-due", text: "Due day (optional)" }),
+          el("input", {
+            id: "task-due",
+            type: "search",
+            name: "task-due",
+            autocomplete: "off",
+            placeholder: "Today, Friday, or Nov 25",
+            value: state.due || "",
+            attrs: { enterkeyhint: "done", maxlength: "40", spellcheck: "false" },
+          }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "save-task", onClick: saveTaskFromForm }, "Save"),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function readTaskForm() {
+    const title = document.getElementById("task-title");
+    const note = document.getElementById("task-note");
+    const due = document.getElementById("task-due");
+    return {
+      title: title && title.value ? title.value : "",
+      note: note && note.value ? note.value : "",
+      due: due && due.value ? due.value : "",
+    };
+  }
+
+  function saveTaskFromForm() {
+    const api = tasksApi();
+    const state = currentState();
+    const fields = readTaskForm();
+    const data = loadTaskData();
+    let dueValue = fields.due;
+    if (fields.due) {
+      const parsed = api.parseDue(fields.due);
+      if (!parsed.ok) {
+        navigate({ ...state, ...fields, notice: parsed.message, noticeKind: "error" }, { push: false });
+        return;
+      }
+      dueValue = parsed.due;
+    } else {
+      dueValue = null;
+    }
+    const result = state.taskId
+      ? api.updateTask(data, state.taskId, { title: fields.title, note: fields.note, due: dueValue })
+      : api.addTask(data, state.listId, { title: fields.title, note: fields.note, due: dueValue });
+    if (!result.ok) {
+      navigate({ ...state, ...fields, notice: result.message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    persistTasks(data);
+    showTasks(state, { listId: result.list.id, taskId: result.task.id, notice: "Saved on this device.", noticeKind: "ok" });
+  }
+
+  function renderTaskDelete(state) {
+    const api = tasksApi();
+    const data = loadTaskData();
+    const kind = state.kind === "list" ? "list" : "task";
+    const list = api.listById(data, state.listId);
+    const found = state.taskId ? api.taskById(data, state.taskId) : null;
+    const label = kind === "list" ? (list ? list.name : "this list") : found ? found.task.title : "this task";
+    return screen([
+      header("Task Cards", kind === "list" ? "Delete list" : "Delete task", "This stays on this device"),
+      el("div", { className: "content stack" }, [
+        el("article", { className: "card" }, [
+          el("p", {
+            className: "step-body",
+            text: kind === "list" ? `Delete ${label} and its tasks from this device?` : `Delete “${label}”?`,
+          }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "confirm-delete-task",
+            onClick: () => {
+              if (kind === "list") api.deleteList(data, state.listId);
+              else api.deleteTask(data, state.taskId);
+              persistTasks(data);
+              const next = loadTaskData();
+              const listId = kind === "list" ? (next.lists[0] && next.lists[0].id) : state.listId;
+              showTasks(state, { listId, taskIndex: 0, taskId: null, notice: "Deleted.", noticeKind: "ok" });
+            },
+          },
+          "Delete"
+        ),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function renderTaskBackup(state) {
+    const api = tasksApi();
+    const blob = state.blob != null ? state.blob : api.exportBlob(loadTaskData());
+    return screen([
+      header("Task Cards", "Export / Import", "Backup stays on this device until you copy it"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "task-backup-blob", text: "JSON text blob" }),
+          el("textarea", {
+            id: "task-backup-blob",
+            className: "field-area",
+            name: "task-backup",
+            value: blob,
+            attrs: { spellcheck: "false", rows: "8", autocomplete: "off" },
+          }),
+          el("p", { className: "hint", text: "Copy this to back up your lists, or paste a backup and choose Import. Nothing is uploaded." }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "refresh-task-backup",
+            onClick: () => navigate({ screen: "tasks-backup", blob: api.exportBlob(loadTaskData()) }, { push: false }),
+          },
+          "Refresh export"
+        ),
+        el("button", { type: "button", className: "secondary primary", id: "import-tasks", onClick: importTasksFromForm }, "Import"),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function importTasksFromForm() {
+    const api = tasksApi();
+    const area = document.getElementById("task-backup-blob");
+    const textValue = area && area.value ? area.value : "";
+    const result = api.importBlob(textValue, loadTaskData());
+    if (result.ok) persistTasks(result.data);
+    navigate(
+      {
+        screen: "tasks-backup",
+        blob: result.ok ? api.exportBlob(result.data) : textValue,
+        notice: result.message,
+        noticeKind: result.ok ? "ok" : "error",
+      },
+      { push: false }
+    );
+  }
+
+  function renderPrompter() {
+    const data = loadPrompterData();
+    const scripts = data.scripts || [];
+    const tiles = scripts.length
+      ? scripts.map((script) => {
+          const api = prompterApi();
+          const segments = api.parseSegments(script.body);
+          return el(
+            "button",
+            {
+              type: "button",
+              className: "tile",
+              onClick: () => navigate({ screen: "prompter-detail", scriptId: script.id }),
+            },
+            [
+              el("span", { className: "tile-title", text: script.title }),
+              el("span", {
+                className: "tile-sub",
+                text: segments.length ? `${segments.length} ${segments.length === 1 ? "segment" : "segments"}` : "Empty script",
+              }),
+            ]
+          );
+        })
+      : [el("article", { className: "card" }, [el("p", { className: "step-body", text: "No scripts yet. Choose New script to add one." })])];
+    return screen([
+      header("Teleprompter", "Scripts", "For streaming notes and talking points"),
+      el("div", { className: "content stack" }, tiles),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "open-new-script", onClick: () => openScriptEditor() }, "New script"),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "open-prompter-backup",
+            onClick: () => navigate({ screen: "prompter-backup" }),
+          },
+          "Export / Import"
+        ),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function openScriptEditor(script) {
+    navigate(
+      {
+        screen: "prompter-edit",
+        scriptId: script ? script.id : "",
+        title: script ? script.title : "",
+        body: script ? script.body : "",
+        notice: "",
+      },
+      { push: true }
+    );
+  }
+
+  function renderPrompterDetail(state) {
+    const api = prompterApi();
+    const data = loadPrompterData();
+    const script = api.scriptById(data, state.scriptId);
+    if (!script) {
+      return screen([
+        header("Teleprompter", "Script", "Not found"),
+        el("div", { className: "content" }, [el("p", { className: "status", text: "That script is gone." })]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ]);
+    }
+    const segments = api.parseSegments(script.body);
+    return screen([
+      header("Teleprompter", script.title, segments.length ? `${segments.length} ${segments.length === 1 ? "segment" : "segments"}` : "No segments yet"),
+      el("div", { className: "content stack" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile primary",
+            id: "start-prompter",
+            onClick: () => startPrompterPlay(script.id),
+          },
+          [el("span", { className: "tile-title", text: "Play" }), el("span", { className: "tile-sub", text: "Enter pauses · Up/Down speed" })]
+        ),
+        el("button", { type: "button", className: "tile", id: "edit-script", onClick: () => openScriptEditor(script) }, [
+          el("span", { className: "tile-title", text: "Edit" }),
+        ]),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "cycle-prompter-size",
+            onClick: () => {
+              api.nudgeFontSize(data, 1);
+              persistPrompter(data);
+              navigate({ screen: "prompter-detail", scriptId: script.id }, { push: false });
+            },
+          },
+          [
+            el("span", { className: "tile-title", text: "Text size" }),
+            el("span", { className: "tile-sub", text: `${data.fontSize} px` }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "delete-script",
+            onClick: () => navigate({ screen: "prompter-delete", scriptId: script.id }, { push: false }),
+          },
+          [el("span", { className: "tile-title", text: "Delete" })]
+        ),
+      ]),
+      el("div", { className: "footer" }, [backButton(), homeButton()]),
+    ]);
+  }
+
+  function renderPrompterEditor(state) {
+    return screen([
+      header("Teleprompter", state.scriptId ? "Edit script" : "New script", "Dictate a line or paste the full script"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "script-title", text: "Title" }),
+          el("input", {
+            id: "script-title",
+            type: "search",
+            name: "script-title",
+            autocomplete: "off",
+            placeholder: "Stream intro",
+            value: state.title || "",
+            attrs: { enterkeyhint: "next", maxlength: "80", spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "script-line", text: "Add a dictated line" }),
+          el("input", {
+            id: "script-line",
+            type: "search",
+            name: "script-line",
+            autocomplete: "off",
+            placeholder: "Dictate a line, then Enter",
+            value: "",
+            attrs: { enterkeyhint: "done", maxlength: "400", spellcheck: "true" },
+          }),
+          el("label", { htmlFor: "script-body", text: "Script body" }),
+          el("textarea", {
+            id: "script-body",
+            className: "field-area",
+            name: "script-body",
+            value: state.body || "",
+            attrs: { spellcheck: "true", rows: "8", autocomplete: "off" },
+          }),
+          el("p", { className: "hint", text: "Lines that start with ## become segments. Add a time like ## Intro 2m." }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "save-script", onClick: saveScriptFromForm }, "Save"),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function appendPrompterLine() {
+    const line = document.getElementById("script-line");
+    const body = document.getElementById("script-body");
+    if (!line || !body) return;
+    const text = line.value.trim();
+    if (!text) return;
+    body.value = body.value ? String(body.value).replace(/\s+$/, "") + "\n" + text : text;
+    line.value = "";
+  }
+
+  function saveScriptFromForm() {
+    const api = prompterApi();
+    const state = currentState();
+    const titleInput = document.getElementById("script-title");
+    const bodyInput = document.getElementById("script-body");
+    const title = titleInput && titleInput.value ? titleInput.value : "";
+    const body = bodyInput && bodyInput.value ? bodyInput.value : "";
+    const data = loadPrompterData();
+    const result = state.scriptId
+      ? api.updateScript(data, state.scriptId, { title, body })
+      : api.addScript(data, { title, body });
+    if (!result.ok) {
+      navigate({ ...state, title, body, notice: result.message, noticeKind: "error" }, { push: false });
+      return;
+    }
+    persistPrompter(data);
+    navigate({ screen: "prompter-detail", scriptId: result.script.id }, { push: false });
+  }
+
+  function renderPrompterDelete(state) {
+    const api = prompterApi();
+    const data = loadPrompterData();
+    const script = api.scriptById(data, state.scriptId);
+    return screen([
+      header("Teleprompter", "Delete script", "This stays on this device"),
+      el("div", { className: "content stack" }, [
+        el("article", { className: "card" }, [
+          el("p", { className: "step-body", text: script ? `Delete “${script.title}”?` : "That script is gone." }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [
+        script
+          ? el(
+              "button",
+              {
+                type: "button",
+                className: "secondary primary",
+                id: "confirm-delete-script",
+                onClick: () => {
+                  api.deleteScript(data, script.id);
+                  persistPrompter(data);
+                  navigate({ screen: "prompter" }, { push: false });
+                },
+              },
+              "Delete"
+            )
+          : null,
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function renderPrompterBackup(state) {
+    const api = prompterApi();
+    const blob = state.blob != null ? state.blob : api.exportBlob(loadPrompterData());
+    return screen([
+      header("Teleprompter", "Export / Import", "Paste JSON or a plain-text script"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "prompter-backup-blob", text: "JSON or plain text" }),
+          el("textarea", {
+            id: "prompter-backup-blob",
+            className: "field-area",
+            name: "prompter-backup",
+            value: blob,
+            attrs: { spellcheck: "false", rows: "8", autocomplete: "off" },
+          }),
+          el("p", { className: "hint", text: "Copy a JSON backup, or paste JSON or a .txt script and choose Import. Nothing is uploaded." }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary",
+            id: "refresh-prompter-backup",
+            onClick: () => navigate({ screen: "prompter-backup", blob: api.exportBlob(loadPrompterData()) }, { push: false }),
+          },
+          "Refresh export"
+        ),
+        el("button", { type: "button", className: "secondary primary", id: "import-scripts", onClick: importScriptsFromForm }, "Import"),
+        backButton(),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function importScriptsFromForm() {
+    const api = prompterApi();
+    const area = document.getElementById("prompter-backup-blob");
+    const textValue = area && area.value ? area.value : "";
+    const result = api.importBlob(textValue, loadPrompterData());
+    if (result.ok) persistPrompter(result.data);
+    navigate(
+      {
+        screen: "prompter-backup",
+        blob: result.ok ? api.exportBlob(result.data) : textValue,
+        notice: result.message,
+        noticeKind: result.ok ? "ok" : "error",
+      },
+      { push: false }
+    );
+  }
+
+  function startPrompterPlay(scriptId) {
+    prompterPlay = null;
+    navigate({ screen: "prompter-play", scriptId }, { push: true });
+  }
+
+  function stopPrompterAnim() {
+    if (prompterRaf) {
+      cancelAnimationFrame(prompterRaf);
+      prompterRaf = null;
+    }
+  }
+
+  function updatePrompterChrome(play) {
+    if (!play) return;
+    const api = prompterApi();
+    const scroller = document.getElementById("prompter-scroll");
+    const timer = document.getElementById("prompter-timer");
+    const segLabel = document.getElementById("prompter-segment");
+    const status = document.getElementById("prompter-status");
+    if (scroller) scroller.style.transform = "translateY(" + -Math.round(play.offset) + "px)";
+    const blocks = document.querySelectorAll(".prompter-block");
+    let segmentIndex = play.segmentIndex || 0;
+    if (blocks.length && scroller) {
+      const stage = document.getElementById("prompter-stage");
+      const stageTop = stage ? stage.getBoundingClientRect().top + 24 : 0;
+      for (let index = 0; index < blocks.length; index += 1) {
+        const rect = blocks[index].getBoundingClientRect();
+        if (rect.bottom > stageTop) {
+          segmentIndex = index;
+          break;
+        }
+        segmentIndex = index;
+      }
+      play.segmentIndex = segmentIndex;
+    }
+    const segment = play.segments && play.segments[segmentIndex];
+    const elapsed = Math.floor((play.elapsedMs || 0) / 1000);
+    if (segLabel) segLabel.textContent = segment ? segment.title : "Script";
+    if (timer) {
+      const target = segment && segment.targetSeconds ? api.formatTimer(segment.targetSeconds) : "";
+      timer.textContent = target ? api.formatTimer(elapsed) + " / " + target : api.formatTimer(elapsed);
+    }
+    if (status) {
+      status.textContent = (play.paused ? "Paused" : "Playing") + " · Speed " + play.speed;
+    }
+  }
+
+  function startPrompterAnim() {
+    stopPrompterAnim();
+    if (!prompterPlay || prompterPlay.paused) {
+      updatePrompterChrome(prompterPlay);
+      return;
+    }
+    let last = performance.now();
+    function tick(now) {
+      const play = prompterPlay;
+      if (!play || play.paused) {
+        prompterRaf = null;
+        return;
+      }
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      play.offset += play.speed * dt;
+      play.elapsedMs += dt * 1000;
+      const scroller = document.getElementById("prompter-scroll");
+      const stage = document.getElementById("prompter-stage");
+      if (scroller && stage) {
+        const max = Math.max(0, scroller.scrollHeight - stage.clientHeight + 80);
+        if (play.offset > max) {
+          play.offset = max;
+          play.paused = true;
+          updatePrompterChrome(play);
+          prompterRaf = null;
+          return;
+        }
+      }
+      updatePrompterChrome(play);
+      prompterRaf = requestAnimationFrame(tick);
+    }
+    prompterRaf = requestAnimationFrame(tick);
+  }
+
+  function nudgePrompterSpeed(direction) {
+    const api = prompterApi();
+    if (!prompterPlay || !api) return;
+    const data = loadPrompterData();
+    data.speed = prompterPlay.speed;
+    api.nudgeSpeed(data, direction);
+    persistPrompter(data);
+    prompterPlay.speed = data.speed;
+    updatePrompterChrome(prompterPlay);
+  }
+
+  function togglePrompterPause() {
+    if (!prompterPlay) return;
+    prompterPlay.paused = !prompterPlay.paused;
+    updatePrompterChrome(prompterPlay);
+    if (prompterPlay.paused) stopPrompterAnim();
+    else startPrompterAnim();
+  }
+
+  function jumpPrompterSegment(direction) {
+    if (!prompterPlay) return;
+    const blocks = document.querySelectorAll(".prompter-block");
+    if (!blocks.length) return;
+    const next = Math.max(0, Math.min(blocks.length - 1, (prompterPlay.segmentIndex || 0) + direction));
+    const scroller = document.getElementById("prompter-scroll");
+    if (!scroller) return;
+    const target = blocks[next];
+    prompterPlay.segmentIndex = next;
+    prompterPlay.offset = Math.max(0, target.offsetTop);
+    updatePrompterChrome(prompterPlay);
+  }
+
+  function renderPrompterPlay(state) {
+    const api = prompterApi();
+    const data = loadPrompterData();
+    const script = api.scriptById(data, state.scriptId);
+    if (!script) {
+      return screen([
+        header("Teleprompter", "Play", "Not found"),
+        el("div", { className: "content" }, [el("p", { className: "status", text: "That script is gone." })]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ]);
+    }
+    const segments = api.parseSegments(script.body);
+    const blocks = (segments.length ? segments : [{ title: script.title, targetSeconds: null, text: script.body || "" }]).map(
+      (segment, index) =>
+        el("article", { className: "prompter-block", dataset: { index: String(index) } }, [
+          el("p", { className: "prompter-block-title", text: segment.title }),
+          el("p", { className: "prompter-block-text", text: segment.text || segment.body || "" }),
+        ])
+    );
+    if (!prompterPlay || prompterPlay.scriptId !== script.id) {
+      prompterPlay = {
+        scriptId: script.id,
+        offset: 0,
+        speed: data.speed,
+        paused: false,
+        elapsedMs: 0,
+        fontSize: data.fontSize,
+        segmentIndex: 0,
+        segments,
+      };
+    } else {
+      prompterPlay.segments = segments;
+      prompterPlay.fontSize = data.fontSize;
+    }
+
+    const view = screen(
+      [
+        el("div", { className: "prompter-meta" }, [
+          el("p", { className: "prompter-segment", id: "prompter-segment", text: segments[0] ? segments[0].title : script.title }),
+          el("p", { className: "prompter-timer", id: "prompter-timer", text: "0:00" }),
+        ]),
+        el("div", { className: "content prompter-stage", id: "prompter-stage" }, [
+          el("div", { className: "prompter-scroll", id: "prompter-scroll" }, blocks),
+        ]),
+        el("div", { className: "footer prompter-footer" }, [
+          el("p", { className: "prompter-status", id: "prompter-status", text: "Playing · Speed " + data.speed }),
+          backButton(),
+        ]),
+      ],
+      "prompter-play"
+    );
+    return view;
+  }
+
+
   function render(state) {
     const screenName = state && state.screen ? state.screen : "home";
     if (screenName !== "home") stopClock();
+    if (screenName !== "prompter-play") {
+      stopPrompterAnim();
+      prompterPlay = null;
+    }
     app.replaceChildren();
     let view;
     switch (screenName) {
@@ -2430,10 +3531,6 @@
       case "recipe-backup":
         view = renderRecipeBackup(state);
         lastFocusSelector = "#recipe-backup-blob";
-        break;
-      case "next-up":
-        view = renderNextUp(state);
-        lastFocusSelector = "#next-up-input";
         break;
       case "coming-soon":
         view = renderComingSoon(state);
@@ -2487,12 +3584,76 @@
         view = renderScaleBackup(state);
         lastFocusSelector = "#scale-backup-blob";
         break;
+      case "tasks":
+        view = renderTasks(state);
+        lastFocusSelector = "#selected-task, #open-new-task";
+        break;
+      case "tasks-actions":
+        view = renderTaskActions(state);
+        lastFocusSelector = "#toggle-task-done";
+        break;
+      case "tasks-edit":
+        view = renderTaskEditor(state);
+        lastFocusSelector = "#task-title";
+        break;
+      case "tasks-move":
+        view = renderTaskMove(state);
+        lastFocusSelector = "button.tile";
+        break;
+      case "tasks-list-menu":
+        view = renderTaskListMenu(state);
+        lastFocusSelector = "#rename-task-list";
+        break;
+      case "tasks-list-name":
+        view = renderTaskListName(state);
+        lastFocusSelector = "#task-list-name";
+        break;
+      case "tasks-delete":
+        view = renderTaskDelete(state);
+        lastFocusSelector = "#confirm-delete-task";
+        break;
+      case "tasks-backup":
+        view = renderTaskBackup(state);
+        lastFocusSelector = "#task-backup-blob";
+        break;
+      case "prompter":
+        view = renderPrompter();
+        lastFocusSelector = "button.tile, #open-new-script";
+        break;
+      case "prompter-detail":
+        view = renderPrompterDetail(state);
+        lastFocusSelector = "#start-prompter";
+        break;
+      case "prompter-edit":
+        view = renderPrompterEditor(state);
+        lastFocusSelector = "#script-title";
+        break;
+      case "prompter-delete":
+        view = renderPrompterDelete(state);
+        lastFocusSelector = "#confirm-delete-script";
+        break;
+      case "prompter-backup":
+        view = renderPrompterBackup(state);
+        lastFocusSelector = "#prompter-backup-blob";
+        break;
+      case "prompter-play":
+        view = renderPrompterPlay(state);
+        lastFocusSelector = "#go-back";
+        break;
       default:
         view = renderHome();
-        lastFocusSelector = "#open-blueprint-help";
+        lastFocusSelector = "#open-task-cards";
     }
     app.append(view);
     if (screenName === "home") startClock();
+    if (screenName === "prompter-play" && prompterPlay) {
+      const scroll = document.getElementById("prompter-scroll");
+      if (scroll) scroll.style.fontSize = prompterPlay.fontSize + "px";
+      window.requestAnimationFrame(() => {
+        updatePrompterChrome(prompterPlay);
+        startPrompterAnim();
+      });
+    }
     window.requestAnimationFrame(() => {
       const target = lastFocusSelector ? app.querySelector(lastFocusSelector) : null;
       if (target && typeof target.focus === "function") target.focus();
@@ -2622,9 +3783,37 @@
       submitMajorMessage();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "next-up-input") {
+    if (event.key === "Enter" && event.target && event.target.id === "task-title") {
       event.preventDefault();
-      saveNextUpFromForm();
+      const note = document.getElementById("task-note");
+      if (note && typeof note.focus === "function") note.focus();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "task-note") {
+      event.preventDefault();
+      const due = document.getElementById("task-due");
+      if (due && typeof due.focus === "function") due.focus();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "task-due") {
+      event.preventDefault();
+      saveTaskFromForm();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "task-list-name") {
+      event.preventDefault();
+      saveTaskListName();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "script-title") {
+      event.preventDefault();
+      const line = document.getElementById("script-line");
+      if (line && typeof line.focus === "function") line.focus();
+      return;
+    }
+    if (event.key === "Enter" && event.target && event.target.id === "script-line") {
+      event.preventDefault();
+      appendPrompterLine();
       return;
     }
     if (event.key === "Enter" && event.target && event.target.id === "recipe-title") {
@@ -2671,6 +3860,55 @@
       return;
     }
     if (isTypingTarget(event.target)) return;
+    if (state && state.screen === "prompter-play") {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        togglePrompterPause();
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        nudgePrompterSpeed(1);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        nudgePrompterSpeed(-1);
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        jumpPrompterSegment(-1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        jumpPrompterSegment(1);
+        return;
+      }
+    }
+    if (state && state.screen === "tasks") {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        shiftTaskList(state, -1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        shiftTaskList(state, 1);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        shiftTaskIndex(state, -1);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        shiftTaskIndex(state, 1);
+        return;
+      }
+    }
     if (state && state.screen === "scale-pace") {
       const id = event.target && event.target.id;
       if (event.key === "Enter" && id !== "scale-reset" && id !== "go-back" && id !== "go-home" && id !== "save-stride") {
@@ -2780,7 +4018,7 @@
       console.warn(err);
       app.replaceChildren(
         screen([
-          header("Thespia", "Could not load", "The recipe library is missing."),
+          header("World Static", "Could not load", "The recipe library is missing."),
           el("div", { className: "content" }, [
             el("p", { className: "status", dataset: { kind: "error" }, text: "Refresh, or check that library.json is next to this page." }),
           ]),

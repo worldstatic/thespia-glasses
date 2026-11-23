@@ -1,6 +1,6 @@
 # Talk to Major — bridge design
 
-This is a design note only. No routine, webhook, account, tunnel, or channel was created while writing it. The glasses app ships a chat UI and a pluggable transport. Live delivery is optional and is configured on the device.
+This is a design note for the **World Static** glasses app. It is a design note only. No routine, webhook, account, tunnel, or channel was created while writing it. The glasses app ships a chat UI and a pluggable transport. Live delivery is optional and is configured on the device.
 
 Facts below were checked on 22 Nov 2026 against official Grok Bot help ([Skills and routines](https://docs.x.ai/grok-bot/skills-routines-and-automations), [Use the computer and apps](https://docs.x.ai/grok-bot/computer-and-apps), [Message and collaborate](https://docs.x.ai/grok-bot/chat-and-collaboration)) and [Meta Wearables Web Apps](https://wearables.developer.meta.com/docs/develop/webapps/).
 
@@ -79,6 +79,11 @@ Skip this unless you already want Major in Slack as a Team Bot for other reasons
 - Do not put a webhook key, relay token, or customer list in this repository.
 - Do not expose a port on the computer to the internet, and do not rely on unofficial internal gateways.
 - Do not treat a webhook `200` as “Major has answered.”
+
+
+## What's next
+
+The glasses app now has the chat UI and the mock transport. The next feature, after the other World Static apps, is the live relay in option 1: a Cloudflare Worker (or another HTTPS host you own) plus a webhook routine on Major. The relay URL and device token would be pasted only in Settings on the glasses. That work has not started, and no worker, routine, or secret belongs in this repository until you are ready.
 
 ## Suggested order when you are ready
 

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "thespia-blueprint-help-";
-const CACHE_NAME = `${CACHE_PREFIX}v4`;
+const CACHE_NAME = `${CACHE_PREFIX}v5`;
 const APP_SHELL = [
   new URL("./", self.registration.scope).href,
   new URL("./index.html", self.registration.scope).href,
@@ -7,8 +7,11 @@ const APP_SHELL = [
   new URL("./app.js", self.registration.scope).href,
   new URL("./major-transport.js", self.registration.scope).href,
   new URL("./scale.js", self.registration.scope).href,
+  new URL("./tasks.js", self.registration.scope).href,
+  new URL("./prompter.js", self.registration.scope).href,
   new URL("./library.json", self.registration.scope).href,
   new URL("./scale-library.json", self.registration.scope).href,
+  new URL("./manifest.webmanifest", self.registration.scope).href,
   new URL("./icons/favicon-64.png", self.registration.scope).href,
   new URL("./icons/icon-128.png", self.registration.scope).href,
   new URL("./icons/icon-512.png", self.registration.scope).href,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local preview server for Thespia Blueprint Help.
+"""Local preview server for the World Static glasses app.
 
 Serves the static Web App and an optional /api/ask helper.
 The app works fully offline from library.json when AI_API_KEY is unset.
@@ -49,6 +49,7 @@ MIME = {
     ".ico": "image/x-icon",
     ".txt": "text/plain; charset=utf-8",
     ".md": "text/plain; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
 }
 
 

@@ -1,9 +1,10 @@
 {
   "version": 1,
-  "name": "Thespia HUD",
-  "description": "Thespia HUD with Blueprint Help, Scale Check, Talk to Major, and a home screen.",
+  "name": "World Static",
+  "short_name": "World Static",
+  "description": "World Static home with Blueprint Help, Task Cards, Teleprompter, Scale Check, and Talk to Major.",
   "appearance": {
-    "theme_color": "#4FC3F7",
+    "theme_color": "#7ee0ff",
     "icon": {
       "src": "../icons/icon-512.png",
       "type": "monochrome"

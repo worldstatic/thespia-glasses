@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local load checks for Thespia HUD / Blueprint Help. Starts the preview server, then curls it."""
+"""Local load checks for the World Static glasses app. Starts the preview server, then curls it."""
 
 from __future__ import annotations
 
@@ -31,10 +31,13 @@ def fetch(path: str, method: str = "GET", data: bytes | None = None, timeout: in
 
 def check_home_and_major(js: str, css: str, html: str, transport: str, failures: list[str]) -> None:
     for needle in (
-        "thespia.hud.nextUp",
+        "World Static",
+        "wordmark",
         "hud-clock",
         "hud-date",
         "Next up",
+        "Task Cards",
+        "Teleprompter",
         "Talk to Major",
         "Blueprint Help",
         "Overlock Walk",
@@ -42,6 +45,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         "Scale Check",
         "3D Scan",
         "Coming soon",
+        "open-task-cards",
+        "open-teleprompter",
         "open-blueprint-help",
         "open-talk-to-major",
         "major-message",
@@ -53,10 +58,16 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
 
     if "background: #000" not in css and "background:#000" not in css:
         failures.append("page canvas is not black")
-    if ".tile-grid" not in css or ".hud-clock" not in css or ".next-up" not in css:
+    if ".tile-grid" not in css or ".hud-clock" not in css or ".next-up" not in css or ".wordmark" not in css:
         failures.append("styles.css missing HUD home rules")
+    if "prefers-reduced-motion" not in css:
+        failures.append("styles.css must respect prefers-reduced-motion")
     if "major-transport.js" not in html:
         failures.append("index.html must load major-transport.js")
+    if 'src="./tasks.js"' not in html or 'src="./prompter.js"' not in html:
+        failures.append("index.html must load tasks.js and prompter.js")
+    if "World Static" not in html:
+        failures.append("index.html must use the World Static title")
     if "thespia.hud.major.transport" not in transport:
         failures.append("transport config key missing")
     if "function send(" not in transport and "send(text)" not in transport:
@@ -338,8 +349,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v4" not in sw and "${CACHE_PREFIX}v4" not in sw:
-        failures.append("service worker cache version should be v4")
+    if "thespia-blueprint-help-v5" not in sw and "${CACHE_PREFIX}v5" not in sw:
+        failures.append("service worker cache version should be v5")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -529,6 +540,219 @@ process.stdout.write("scale-logic-ok\n");
         failures.append(f"Scale Check logic tests failed: {detail}")
 
 
+
+def check_task_cards(js: str, css: str, html: str, sw: str, failures: list[str]) -> None:
+    for needle in (
+        "Task Cards",
+        "open-task-cards",
+        "open-new-task",
+        "open-task-actions",
+        "task-title",
+        "task-note",
+        "task-due",
+        "task-list-name",
+        "task-backup-blob",
+        "import-tasks",
+        "clear-done-tasks",
+        "toggle-task-done",
+        'screen: "tasks"',
+        'screen: "tasks-edit"',
+        "function renderTasks(",
+        "function saveTaskFromForm(",
+        "WorldStaticTasks",
+        'type: "search"',
+        "Export / Import",
+    ):
+        if needle not in js:
+            failures.append(f"app.js missing Task Cards support: {needle}")
+
+    for field_id in ("task-title", "task-note", "task-due", "task-list-name"):
+        idx = js.find(f'id: "{field_id}"')
+        if idx < 0:
+            failures.append(f"{field_id} is missing")
+            continue
+        window = js[idx : idx + 280]
+        if 'type: "search"' not in window:
+            failures.append(f"{field_id} must use type=search")
+
+    tasks_src = (ROOT / "tasks.js").read_text(encoding="utf-8") if (ROOT / "tasks.js").is_file() else ""
+    for needle in (
+        "thespia.hud.tasks",
+        "function parseDue(",
+        "function topUnfinished(",
+        "function clearDone(",
+        "function exportBlob(",
+        "function importBlob(",
+        "Work",
+        "Home",
+        "Projects",
+        "Review today's checklist",
+        "Take out the recycling",
+        "Sketch the next layout",
+    ):
+        if needle not in tasks_src:
+            failures.append(f"tasks.js missing helper or seed: {needle}")
+
+    lowered = tasks_src.lower()
+    for banned in ("extra space", "customer", "unit  "):
+        if banned in lowered:
+            failures.append(f"tasks.js seed or comments look like work/personal data: {banned!r}")
+
+    if 'src="./tasks.js"' not in html:
+        failures.append("index.html must load tasks.js")
+    if ".task-item" not in css or ".task-due" not in css:
+        failures.append("styles.css missing Task Cards rules")
+    if "tasks.js" not in sw:
+        failures.append("service worker missing tasks.js")
+    run_task_and_prompter_logic_tests(failures)
+
+
+def check_teleprompter(js: str, css: str, html: str, sw: str, failures: list[str]) -> None:
+    for needle in (
+        "Teleprompter",
+        "open-teleprompter",
+        "open-new-script",
+        "script-title",
+        "script-line",
+        "script-body",
+        "prompter-backup-blob",
+        "import-scripts",
+        "start-prompter",
+        "prompter-scroll",
+        'screen: "prompter"',
+        'screen: "prompter-play"',
+        "function renderPrompterPlay(",
+        "WorldStaticPrompter",
+        "function togglePrompterPause(",
+        "function jumpPrompterSegment(",
+        'type: "search"',
+    ):
+        if needle not in js:
+            failures.append(f"app.js missing Teleprompter support: {needle}")
+
+    for field_id in ("script-title", "script-line"):
+        idx = js.find(f'id: "{field_id}"')
+        if idx < 0:
+            continue
+        window = js[idx : idx + 280]
+        if 'type: "search"' not in window:
+            failures.append(f"{field_id} must use type=search")
+
+    prompter_src = (ROOT / "prompter.js").read_text(encoding="utf-8") if (ROOT / "prompter.js").is_file() else ""
+    for needle in (
+        "thespia.hud.prompter",
+        "function parseSegments(",
+        "function parseDuration(",
+        "function parseSegmentHeading(",
+        "function exportBlob(",
+        "function importBlob(",
+        "## Intro 2m",
+        "Stream intro",
+        "DEFAULT_SCRIPT_BODY",
+    ):
+        if needle not in prompter_src:
+            failures.append(f"prompter.js missing helper or seed: {needle}")
+
+    if 'src="./prompter.js"' not in html:
+        failures.append("index.html must load prompter.js")
+    if ".prompter-stage" not in css or ".prompter-scroll" not in css:
+        failures.append("styles.css missing Teleprompter play rules")
+    if "prompter.js" not in sw:
+        failures.append("service worker missing prompter.js")
+
+
+def run_task_and_prompter_logic_tests(failures: list[str]) -> None:
+    """Run due-day parsing, task storage, and teleprompter segment parsing in Node."""
+    tasks_path = json.dumps(str(ROOT / "tasks.js"))
+    prompter_path = json.dumps(str(ROOT / "prompter.js"))
+    harness = f"""
+const T = require({tasks_path});
+const P = require({prompter_path});
+function assert(cond, message) {{
+  if (!cond) throw new Error(message);
+}}
+const now = new Date(2026, 10, 22);
+assert(T.parseDue("today", now).due === "2026-11-22", "today");
+assert(T.parseDue("tomorrow", now).due === "2026-11-23", "tomorrow");
+assert(T.parseDue("Friday", now).due === "2026-11-27", "friday");
+assert(T.parseDue("Sunday", now).due === "2026-11-22", "sunday is today");
+assert(T.parseDue("Nov 25", now).due === "2026-11-25", "nov 25");
+assert(T.parseDue("nov 20", now).due === "2027-11-20", "past day rolls forward");
+assert(T.parseDue("2026-12-01", now).due === "2026-12-01", "iso");
+assert(T.parseDue("none", now).due === null, "clear due");
+assert(T.formatDue("2026-11-22", now) === "Today", "format today");
+assert(T.formatDue("2026-11-20", now) === "Overdue · Nov 20", "format overdue");
+assert(T.formatDue("2026-11-27", now) === "Friday", "format weekday");
+
+const store = {{}};
+const localStorage = {{
+  getItem(key) {{ return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; }},
+  setItem(key, value) {{ store[key] = String(value); }},
+  removeItem(key) {{ delete store[key]; }},
+}};
+let data = T.loadAndPersist(localStorage);
+assert(data.lists.map((list) => list.name).join(",") === "Work,Home,Projects", "default lists");
+assert(T.topUnfinished(data).task.title === "Review today's checklist", "seeded next up");
+const added = T.addTask(data, "work", {{ title: "Ship the build", due: "2026-11-22" }});
+assert(added.ok, "add task");
+assert(T.topUnfinished(data).task.title === "Ship the build", "earliest due is next");
+T.toggleTask(data, added.task.id);
+assert(T.progress(T.listById(data, "work")).done === 1, "progress count");
+T.save(data, localStorage);
+const blob = T.exportBlob(data);
+const imported = T.importBlob(blob, T.emptyData());
+assert(imported.ok && T.listById(imported.data, "work").tasks.length >= 2, "task import");
+const cleared = T.clearDone(imported.data, "work");
+assert(cleared.ok && T.listById(imported.data, "work").tasks.every((task) => !task.done), "clear done");
+T.renameList(imported.data, "home", "House");
+assert(T.listById(imported.data, "home").name === "House", "rename list");
+const moved = T.moveTask(imported.data, T.listById(imported.data, "projects").tasks[0].id, "home");
+assert(moved.ok, "move task");
+
+assert(P.parseDuration("2m") === 120, "2m");
+assert(P.parseDuration("1m 30s") === 90, "1m 30s");
+assert(P.parseDuration("1:30") === 90, "1:30");
+assert(P.parseDuration("90s") === 90, "90s");
+assert(P.parseDuration("1h") === 3600, "1h");
+assert(P.parseDuration("15m") === 900, "15m");
+assert(P.parseDuration("plan 3m") == null, "duration must not eat nearby words");
+assert(P.formatTimer(90) === "1:30", "timer format");
+const segments = P.parseSegments(P.DEFAULT_SCRIPT_BODY);
+assert(segments.length === 3, "expected 3 seed segments, got " + segments.length);
+assert(segments[0].title === "Intro" && segments[0].targetSeconds === 120, "intro segment");
+assert(segments[1].title === "Today's plan" && segments[1].targetSeconds === 180, "plan segment");
+assert(segments[2].title === "Outro" && segments[2].targetSeconds === 60, "outro segment");
+assert(segments[0].text.toLowerCase().includes("welcome"), "intro body");
+const plain = P.parseSegments("Just a line.");
+assert(plain.length === 1 && plain[0].title === "Script", "body without headings");
+const pdata = P.seedData();
+assert(pdata.scripts[0].title === "Stream intro", "seed script title");
+const fromText = P.importBlob("Hello stream people\\nWelcome in.", P.emptyData());
+assert(fromText.ok && fromText.data.scripts[0].body.includes("Welcome"), "plain text import");
+const roundTrip = P.importBlob(P.exportBlob(pdata), P.emptyData());
+assert(roundTrip.ok && roundTrip.data.scripts.some((script) => script.title === "Stream intro"), "json import");
+process.stdout.write("task-prompter-logic-ok\\n");
+"""
+
+    import tempfile
+    from pathlib import Path as _Path
+
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as handle:
+        handle.write(harness)
+        temp_name = handle.name
+    try:
+        result = subprocess.run(["node", temp_name], capture_output=True, text=True)
+    except FileNotFoundError:
+        failures.append("node is required to run Task Cards and Teleprompter tests")
+        return
+    finally:
+        _Path(temp_name).unlink(missing_ok=True)
+
+    if result.returncode != 0 or "task-prompter-logic-ok" not in (result.stdout or ""):
+        detail = (result.stderr or result.stdout or "no output").strip()
+        failures.append(f"Task Cards / Teleprompter logic tests failed: {detail}")
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -586,6 +810,8 @@ def main() -> int:
     check_home_and_major(js, css, html, transport, failures)
     check_custom_recipes(js, css, failures)
     check_scale_check(js, css, html, sw, failures)
+    check_task_cards(js, css, html, sw, failures)
+    check_teleprompter(js, css, html, sw, failures)
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],
@@ -620,11 +846,14 @@ def main() -> int:
             return 1
 
         checks = {
-            "/": ("text/html", b"Thespia HUD"),
+            "/": ("text/html", b"World Static"),
             "/styles.css": ("text/css", b"app-shell"),
             "/app.js": ("text/javascript", b"Blueprint Help"),
             "/major-transport.js": ("text/javascript", b"thespia.hud.major.transport"),
             "/scale.js": ("text/javascript", b"ThespiaScale"),
+            "/tasks.js": ("text/javascript", b"WorldStaticTasks"),
+            "/prompter.js": ("text/javascript", b"WorldStaticPrompter"),
+            "/manifest.webmanifest": ("application/manifest+json", b"World Static"),
             "/library.json": ("application/json", b"line-trace"),
             "/scale-library.json": ("application/json", b"default-capsule"),
             "/sw.js": ("text/javascript", b"thespia-blueprint-help-"),
@@ -646,7 +875,7 @@ def main() -> int:
         # Home page markup is built in JS; confirm the shipped script has the tiles
         # and that the served file matches the local copy.
         status, _, body = fetch("/app.js")
-        for needle in (b"hud-clock", b"Next up", b"Talk to Major", b"Coming soon", b"Overlock Walk"):
+        for needle in (b"hud-clock", b"Next up", b"World Static", b"Task Cards", b"Teleprompter", b"Talk to Major", b"Coming soon", b"Overlock Walk"):
             if needle not in body:
                 failures.append(f"served app.js missing {needle.decode()}")
 
@@ -686,7 +915,7 @@ def main() -> int:
             print("-", item)
         return 1
     print("PASS")
-    print(f"Loaded HUD home, Scale Check, Talk to Major transport, {len(recipes)} recipes, health endpoint, and 503 AI fallback at {BASE}")
+    print(f"Loaded World Static home, Task Cards, Teleprompter, Scale Check, Talk to Major transport, {len(recipes)} recipes, health endpoint, and 503 AI fallback at {BASE}")
     return 0
 
 

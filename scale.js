@@ -1,4 +1,4 @@
-/* Thespia Scale Check helpers.
+/* World Static Scale Check helpers.
    Pure conversion, parsing, and localStorage helpers for the glasses app.
    1 Unreal unit (uu) = 1 cm. Manny reference height defaults to 180 cm.
 */
