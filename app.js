@@ -17,11 +17,11 @@
   const APP_TILES = [
     {
       id: "funds",
-      title: "Add spend",
-      sub: "Log today's total",
-      screen: "funds-entry",
+      title: "Daily funds",
+      sub: "Spend, remaining, and today's list",
+      screen: "funds-home",
       available: true,
-      buttonId: "open-add-spend",
+      buttonId: "open-daily-funds",
       icon: "funds",
     },
     {
@@ -68,6 +68,33 @@
       available: true,
       buttonId: "open-talk",
       icon: "talk",
+    },
+    {
+      id: "timer",
+      title: "Timer",
+      sub: "Countdown or stopwatch",
+      screen: "timer",
+      available: true,
+      buttonId: "open-timer",
+      icon: "timer",
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      sub: "Dictated scratch pad",
+      screen: "notes",
+      available: true,
+      buttonId: "open-notes",
+      icon: "notes",
+    },
+    {
+      id: "focus",
+      title: "Focus",
+      sub: "25 minutes on, 5 off",
+      screen: "focus",
+      available: true,
+      buttonId: "open-focus",
+      icon: "focus",
     },
     { id: "scan", title: "3D Scan", sub: "Coming soon", available: false, icon: "scan" },
     { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false, icon: "overlock" },
@@ -491,7 +518,7 @@
 
   function appVersionLabel() {
     const nav = window.WorldStaticFocusNav;
-    const ver = (nav && nav.APP_VERSION) || "v15";
+    const ver = (nav && nav.APP_VERSION) || "v16";
     return el("p", { className: "app-version", id: "app-version", text: ver });
   }
 
@@ -743,7 +770,7 @@
         type: "button",
         className: over ? "funds-badge over" : "funds-badge",
         id: "open-funds",
-        onClick: () => navigate({ screen: "funds-budget" }),
+        onClick: () => navigate({ screen: "funds-home" }),
         attrs: {
           "aria-label": budget ? leftText + ", " + spentText : "Set a daily budget",
         },
@@ -779,7 +806,7 @@
         id: "open-current-task",
         onClick: () => {
           if (current) {
-            navigate({ screen: "tasks", listId: current.list.id, taskId: current.task.id });
+            navigate({ screen: "tasks-detail", listId: current.list.id, taskId: current.task.id });
             return;
           }
           navigate({ screen: "tasks" });
@@ -1088,14 +1115,14 @@
           : "";
     return screen(
       [
-        header("Daily funds", "Budget", "Spent resets at midnight"),
+        header("Daily funds", "Set daily amount", "Remaining is this amount minus today's spend"),
         el("div", { className: "content stack" }, [
           el("p", { className: "hint", text: "Spent today " + spent + "  ·  Left " + left }),
           notice
             ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "error" } })
             : null,
           el("div", { className: "field-wrap stack" }, [
-            el("label", { htmlFor: "funds-budget", text: "Daily budget" }),
+            el("label", { htmlFor: "funds-budget", text: "Daily amount" }),
             el("input", {
               id: "funds-budget",
               type: "search",
@@ -1113,17 +1140,7 @@
             { type: "button", className: "secondary primary", id: "save-funds-budget", onClick: submitFundsBudget },
             "Save"
           ),
-          el(
-            "button",
-            {
-              type: "button",
-              className: "secondary",
-              id: "funds-budget-add",
-              onClick: () => navigate({ screen: "funds-entry", step: "amount", amount: "", label: "" }),
-            },
-            "Add spend"
-          ),
-          homeButton(),
+          el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "funds-home" }, { push: false }) }, "Back"),
         ]),
       ],
       "funds-budget-screen"
@@ -1191,7 +1208,7 @@
       return;
     }
     api.save(result.data);
-    navigate(HOME_STATE, { push: false });
+    navigate({ screen: "funds-transactions", notice: "Saved on this device.", noticeKind: "ok" }, { push: false });
   }
 
   function submitFundsBudget() {
@@ -1210,7 +1227,7 @@
       return;
     }
     api.save(result.data);
-    navigate(HOME_STATE, { push: false });
+    navigate({ screen: "funds-home", notice: "Daily amount saved.", noticeKind: "ok" }, { push: false });
   }
 
   function saveNextUpFromForm() {
@@ -3433,6 +3450,18 @@
       "M4.5 9.5h15v9.2A1.8 1.8 0 0 1 17.7 20.5H6.3A1.8 1.8 0 0 1 4.5 18.7z",
       { tag: "circle", cx: "16", cy: "14.8", r: "1.35" },
     ],
+    timer: [
+      { tag: "circle", cx: "12", cy: "12.5", r: "7.5" },
+      "M12 8.2v4.2l2.6 1.6",
+      "M9 4.5h6",
+    ],
+    notes: ["M7 4.5h10v15H7z", "M9.2 8.2h5.6", "M9.2 11.2h5.6", "M9.2 14.2h3.8"],
+    focus: [
+      { tag: "circle", cx: "12", cy: "12", r: "8" },
+      { tag: "circle", cx: "12", cy: "12", r: "3.6" },
+      "M12 4v2.2",
+      "M12 17.8V20",
+    ],
   };
 
   function resolveTaskSelection(state) {
@@ -3501,6 +3530,105 @@
     showTasks(state, { listId: sel.list.id, taskId: task.id, taskIndex: sel.taskIndex });
   }
 
+  function openTaskDetail(state, extra, { push = true } = {}) {
+    const sel = resolveTaskSelection({ ...(state || {}), ...(extra || {}) });
+    if (!sel.list || !sel.tasks.length) {
+      showTasks(state, extra);
+      return;
+    }
+    const task = sel.tasks[sel.taskIndex];
+    navigate(
+      {
+        screen: "tasks-detail",
+        listId: sel.list.id,
+        taskId: task.id,
+        taskIndex: sel.taskIndex,
+        notice: "",
+        noticeKind: "",
+        ...(extra || {}),
+      },
+      { push }
+    );
+  }
+
+  function toggleChecklistItem(state, itemId) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const task = sel.tasks[sel.taskIndex];
+    if (!api || !task) return;
+    api.toggleItem(sel.data, task.id, itemId);
+    persistTasks(sel.data);
+    openTaskDetail(state, { listId: sel.list.id, taskId: task.id, taskIndex: sel.taskIndex }, { push: false });
+  }
+
+  function renderTaskDetail(state) {
+    const api = tasksApi();
+    const sel = resolveTaskSelection(state);
+    const task = sel.tasks[sel.taskIndex];
+    if (!task) {
+      return screen([
+        header("Task Cards", "Card", "Not found"),
+        el("div", { className: "content" }, [el("p", { className: "status", text: "That task is gone." })]),
+        el("div", { className: "footer" }, [
+          el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => showTasks(state) }, "Back"),
+          homeButton(),
+        ]),
+      ]);
+    }
+    const dueLabel = task.due && api ? api.formatDue(task.due) : "";
+    const items = (task.items || []).map((item, index) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: "tile task-check" + (item.done ? " is-done" : ""),
+          id: "task-check-" + index,
+          dataset: { itemId: item.id },
+          onClick: () => toggleChecklistItem(state, item.id),
+        },
+        [
+          el("span", { className: "tile-title" }, [
+            el("span", { className: "task-mark", text: item.done ? "✓" : "○" }),
+            item.text,
+          ]),
+        ]
+      )
+    );
+    return screen([
+      header("Task Cards", task.title, sel.list ? sel.list.name : "Task"),
+      el("div", { className: "content stack" }, [
+        task.note ? el("p", { className: "step-body", text: task.note }) : null,
+        dueLabel ? el("p", { className: "task-due" + (dueLabel.indexOf("Overdue") === 0 ? " is-overdue" : ""), text: dueLabel }) : null,
+        items.length
+          ? el("div", { className: "stack", attrs: { role: "list" } }, items)
+          : el("p", { className: "hint", text: "No checklist on this card. Mark it done, or edit to add bullets in the note." }),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "toggle-task-done",
+            onClick: () => {
+              api.toggleTask(sel.data, task.id);
+              persistTasks(sel.data);
+              openTaskDetail(state, { listId: sel.list.id, taskId: task.id }, { push: false });
+            },
+          },
+          [el("span", { className: "tile-title", text: task.done ? "Mark not done" : "Mark done" })]
+        ),
+        el("button", { type: "button", className: "tile", id: "edit-task", onClick: () => openTaskEditor(sel.list.id, task, "tasks-detail") }, [
+          el("span", { className: "tile-title", text: "Edit" }),
+          el("span", { className: "tile-sub", text: "Title, note, or due day" }),
+        ]),
+        state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => showTasks(state, { listId: sel.list.id, taskId: task.id, taskIndex: sel.taskIndex }) }, "Back"),
+        homeButton(),
+      ]),
+    ]);
+  }
+
   function renderTasks(state) {
     const api = tasksApi();
     const sel = resolveTaskSelection(state);
@@ -3514,12 +3642,9 @@
             {
               type: "button",
               className: "tile task-item" + (index === sel.taskIndex ? " is-selected" : "") + (task.done ? " is-done" : ""),
-              id: index === sel.taskIndex ? "selected-task" : "task-item-" + index,
+              id: "task-item-" + index,
               dataset: { taskId: task.id },
-              onClick: () => {
-                if (index === sel.taskIndex) toggleSelectedTask({ ...state, listId: sel.list.id, taskId: task.id, taskIndex: index });
-                else showTasks(state, { listId: sel.list.id, taskId: task.id, taskIndex: index });
-              },
+              onClick: () => openTaskDetail({ ...state, listId: sel.list.id, taskId: task.id, taskIndex: index }),
             },
             [
               el("span", { className: "tile-title" }, [
@@ -3542,11 +3667,6 @@
     return screen([
       header("Task Cards", sel.list ? sel.list.name : "Tasks", progress.total ? `${progress.done} of ${progress.total} done` : "No tasks yet"),
       el("div", { className: "content stack" }, [
-        el("div", { className: "task-switcher" }, [
-          el("button", { type: "button", className: "secondary", id: "task-list-prev", onClick: () => shiftTaskList(state, -1) }, "Prev list"),
-          el("span", { className: "task-switcher-name", text: sel.list ? sel.list.name : "Tasks" }),
-          el("button", { type: "button", className: "secondary", id: "task-list-next", onClick: () => shiftTaskList(state, 1) }, "Next list"),
-        ]),
         el("div", { className: "stack", attrs: { role: "list" } }, items),
         state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
       ]),
@@ -3584,7 +3704,7 @@
     );
   }
 
-  function openTaskEditor(listId, task) {
+  function openTaskEditor(listId, task, returnScreen) {
     navigate(
       {
         screen: "tasks-edit",
@@ -3594,6 +3714,7 @@
         title: task ? task.title : "",
         note: task ? task.note : "",
         due: task ? task.due || "" : "",
+        returnScreen: returnScreen || "tasks",
         notice: "",
       },
       { push: true }
@@ -3723,6 +3844,22 @@
     return screen([
       header("Task Cards", "Lists", sel.list ? sel.list.name : ""),
       el("div", { className: "content stack" }, [
+        el("p", { className: "hint", text: "Choose a list, then go back to its cards." }),
+        ...sel.lists.map((list, index) =>
+          el(
+            "button",
+            {
+              type: "button",
+              className: "tile" + (sel.list && list.id === sel.list.id ? " is-selected" : ""),
+              id: "task-list-pick-" + index,
+              onClick: () => showTasks(state, { listId: list.id, taskIndex: 0, taskId: null }),
+            },
+            [
+              el("span", { className: "tile-title", text: list.name }),
+              el("span", { className: "tile-sub", text: (list.tasks || []).length ? (list.tasks.length + " cards") : "Empty" }),
+            ]
+          )
+        ),
         el(
           "button",
           {
@@ -3948,6 +4085,10 @@
       return;
     }
     persistTasks(data);
+    if (state.returnScreen === "tasks-detail" && result.task) {
+      openTaskDetail(state, { listId: result.list.id, taskId: result.task.id, notice: "Saved on this device.", noticeKind: "ok" }, { push: false });
+      return;
+    }
     showTasks(state, { listId: result.list.id, taskId: result.task.id, notice: "Saved on this device.", noticeKind: "ok" });
   }
 
@@ -4115,6 +4256,11 @@
       ]);
     }
     const segments = api.parseSegments(script.body);
+    const slides = api.splitSlides ? api.splitSlides(script.body, data.fontSize) : segments;
+    const mode = api.normalizePlayMode ? api.normalizePlayMode(data.playMode) : "scroll";
+    const playSub = mode === "slides"
+      ? "Slides  ·  " + (slides.length || 0) + " cards  ·  swipe to change"
+      : "Scroll  ·  Enter pauses  ·  Up/Down speed";
     return screen([
       header("Teleprompter", script.title, segments.length ? `${segments.length} ${segments.length === 1 ? "segment" : "segments"}` : "No segments yet"),
       el("div", { className: "content stack" }, [
@@ -4126,8 +4272,40 @@
             id: "start-prompter",
             onClick: () => startPrompterPlay(script.id),
           },
-          [el("span", { className: "tile-title", text: "Play" }), el("span", { className: "tile-sub", text: "Enter pauses · Up/Down speed" })]
+          [el("span", { className: "tile-title", text: "Play" }), el("span", { className: "tile-sub", text: playSub })]
         ),
+        el("div", { className: "kind-toggle-row", id: "prompter-mode-row" }, [
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary" + (mode === "scroll" ? " selected" : ""),
+              id: "prompter-mode-scroll",
+              onClick: () => {
+                api.setPlayMode(data, "scroll");
+                persistPrompter(data);
+                navigate({ screen: "prompter-detail", scriptId: script.id }, { push: false });
+              },
+              attrs: { "aria-pressed": mode === "scroll" ? "true" : "false" },
+            },
+            "Scroll"
+          ),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary" + (mode === "slides" ? " selected" : ""),
+              id: "prompter-mode-slides",
+              onClick: () => {
+                api.setPlayMode(data, "slides");
+                persistPrompter(data);
+                navigate({ screen: "prompter-detail", scriptId: script.id }, { push: false });
+              },
+              attrs: { "aria-pressed": mode === "slides" ? "true" : "false" },
+            },
+            "Slides"
+          ),
+        ]),
         el("button", { type: "button", className: "tile", id: "edit-script", onClick: () => openScriptEditor(script) }, [
           el("span", { className: "tile-title", text: "Edit" }),
         ]),
@@ -4368,7 +4546,15 @@
       timer.textContent = target ? api.formatTimer(elapsed) + " / " + target : api.formatTimer(elapsed);
     }
     if (status) {
-      status.textContent = (play.paused ? "Paused" : "Playing") + " · Speed " + play.speed;
+      if (play.mode === "slides") {
+        const total = (play.slides && play.slides.length) || 0;
+        const index = Math.min(Math.max(0, play.slideIndex || 0), Math.max(0, total - 1));
+        status.textContent = "Slides  ·  swipe to change";
+        const count = document.getElementById("prompter-slide-count");
+        if (count && total) count.textContent = (index + 1) + " / " + total;
+      } else {
+        status.textContent = (play.paused ? "Paused" : "Playing") + " · Speed " + play.speed;
+      }
     }
   }
 
@@ -4426,6 +4612,18 @@
     else startPrompterAnim();
   }
 
+  function stepPrompterSlide(direction) {
+    if (!prompterPlay || prompterPlay.mode !== "slides") return false;
+    const total = (prompterPlay.slides && prompterPlay.slides.length) || 0;
+    if (!total) return false;
+    const next = (prompterPlay.slideIndex || 0) + (direction < 0 ? -1 : 1);
+    if (next < 0 || next >= total) return false;
+    prompterPlay.slideIndex = next;
+    const state = currentState();
+    navigate({ ...(state || {}), screen: "prompter-play", scriptId: prompterPlay.scriptId }, { push: false });
+    return true;
+  }
+
   function jumpPrompterSegment(direction) {
     if (!prompterPlay) return;
     const blocks = document.querySelectorAll(".prompter-block");
@@ -4450,14 +4648,9 @@
         el("div", { className: "footer" }, [backButton(), homeButton()]),
       ]);
     }
+    const mode = api.normalizePlayMode ? api.normalizePlayMode(data.playMode) : "scroll";
     const segments = api.parseSegments(script.body);
-    const blocks = (segments.length ? segments : [{ title: script.title, targetSeconds: null, text: script.body || "" }]).map(
-      (segment, index) =>
-        el("article", { className: "prompter-block", dataset: { index: String(index) } }, [
-          el("p", { className: "prompter-block-title", text: segment.title }),
-          el("p", { className: "prompter-block-text", text: segment.text || segment.body || "" }),
-        ])
-    );
+    const slides = api.splitSlides ? api.splitSlides(script.body, data.fontSize) : [];
     if (!prompterPlay || prompterPlay.scriptId !== script.id) {
       prompterPlay = {
         scriptId: script.id,
@@ -4467,12 +4660,58 @@
         elapsedMs: 0,
         fontSize: data.fontSize,
         segmentIndex: 0,
+        slideIndex: 0,
+        mode: mode,
         segments,
+        slides,
       };
     } else {
       prompterPlay.segments = segments;
+      prompterPlay.slides = slides;
       prompterPlay.fontSize = data.fontSize;
+      prompterPlay.mode = mode;
     }
+
+    if (mode === "slides") {
+      const total = Math.max(1, slides.length);
+      const index = Math.max(0, Math.min(total - 1, prompterPlay.slideIndex || 0));
+      prompterPlay.slideIndex = index;
+      const slide = slides[index] || { title: script.title, text: script.body || "" };
+      return screen(
+        [
+          el("div", { className: "prompter-meta" }, [
+            el("p", { className: "prompter-segment", id: "prompter-segment", text: slide.title || script.title }),
+            el("p", { className: "prompter-timer", id: "prompter-slide-count", text: (index + 1) + " / " + total }),
+          ]),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "content prompter-stage prompter-slide-stage",
+              id: "prompter-stage",
+              onClick: () => stepPrompterSlide(1),
+            },
+            [
+              slide.title ? el("p", { className: "prompter-block-title", text: slide.title }) : null,
+              el("p", { className: "prompter-slide-text", text: slide.text || "" }),
+            ]
+          ),
+          el("div", { className: "footer prompter-footer" }, [
+            el("p", { className: "prompter-status", id: "prompter-status", text: "Slides  ·  swipe to change" }),
+            backButton(),
+          ]),
+        ],
+        "prompter-play prompter-slides"
+      );
+    }
+
+    const blocks = (segments.length ? segments : [{ title: script.title, targetSeconds: null, text: script.body || "" }]).map(
+      (segment, index) =>
+        el("article", { className: "prompter-block", dataset: { index: String(index) } }, [
+          el("p", { className: "prompter-block-title", text: segment.title }),
+          el("p", { className: "prompter-block-text", text: segment.text || segment.body || "" }),
+        ])
+    );
 
     const view = screen(
       [
@@ -4480,7 +4719,7 @@
           el("p", { className: "prompter-segment", id: "prompter-segment", text: segments[0] ? segments[0].title : script.title }),
           el("p", { className: "prompter-timer", id: "prompter-timer", text: "0:00" }),
         ]),
-        el("div", { className: "content prompter-stage", id: "prompter-stage" }, [
+        el("div", { className: "content prompter-stage", id: "prompter-stage", attrs: { tabindex: "0" } }, [
           el("div", { className: "prompter-scroll", id: "prompter-scroll" }, blocks),
         ]),
         el("div", { className: "footer prompter-footer" }, [
@@ -4494,11 +4733,535 @@
   }
 
 
+  function renderFundsHome(state) {
+    const api = fundsApi();
+    const funds = api ? api.loadAndPersist() : null;
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const spent = funds ? money(funds.spent) : "$0";
+    const left = funds && api ? money(api.remaining(funds)) : "$0";
+    const budget = funds && funds.budget ? money(funds.budget) : "Not set";
+    const count = funds && funds.entries ? funds.entries.length : 0;
+    return screen([
+      header("Daily funds", left, "Remaining of " + budget + "  ·  Spent " + spent),
+      el("div", { className: "content stack" }, [
+        state && state.notice
+          ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } })
+          : null,
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile primary",
+            id: "open-add-spend",
+            onClick: () => navigate({ screen: "funds-entry", step: "amount", amount: "", label: "" }),
+          },
+          [el("span", { className: "tile-title", text: "Add spend" }), el("span", { className: "tile-sub", text: "Amount, then a label" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-transactions",
+            onClick: () => navigate({ screen: "funds-transactions" }),
+          },
+          [
+            el("span", { className: "tile-title", text: "Transactions" }),
+            el("span", { className: "tile-sub", text: count ? count + (count === 1 ? " today" : " today, newest first") : "None yet today" }),
+          ]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-funds-budget",
+            onClick: () => navigate({ screen: "funds-budget" }),
+          },
+          [el("span", { className: "tile-title", text: "Set daily amount" }), el("span", { className: "tile-sub", text: "Now " + budget })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-reset-day",
+            onClick: () => navigate({ screen: "funds-reset-day" }),
+          },
+          [el("span", { className: "tile-title", text: "Reset today" }), el("span", { className: "tile-sub", text: "Clear spent and transactions" })]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "tile",
+            id: "open-reset-budget",
+            onClick: () => navigate({ screen: "funds-reset-budget" }),
+          },
+          [el("span", { className: "tile-title", text: "Reset daily amount" }), el("span", { className: "tile-sub", text: "Transactions stay" })]
+        ),
+      ]),
+      el("div", { className: "footer" }, [homeButton()]),
+    ], "funds-home-screen");
+  }
+
+  function renderFundsTransactions(state) {
+    const api = fundsApi();
+    const funds = api ? api.loadAndPersist() : null;
+    const rows = api && funds ? api.transactions(funds) : [];
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const list = rows.length
+      ? rows.map((row, index) =>
+          el(
+            "button",
+            {
+              type: "button",
+              className: "tile tx-row",
+              id: "funds-tx-" + index,
+              dataset: { entryId: row.id },
+              onClick: () => navigate({ screen: "funds-tx-delete", entryId: row.id }),
+            },
+            [
+              el("span", { className: "tile-title", text: money(row.amount) + (row.label ? "  " + row.label : "") }),
+              el("span", { className: "tile-sub", text: api.formatTime(row.ts) || "Today" }),
+            ]
+          )
+        )
+      : [el("p", { className: "hint", text: "No transactions yet today. Add spend to start the list." })];
+    return screen([
+      header("Daily funds", "Transactions", rows.length ? "Newest first  ·  pinch a row to delete" : "Today"),
+      el("div", { className: "content stack" }, [
+        state && state.notice
+          ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } })
+          : null,
+        el("div", { className: "stack", attrs: { role: "list" } }, list),
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "funds-home" }, { push: false }) }, "Back"),
+        homeButton(),
+      ]),
+    ], "funds-tx-screen");
+  }
+
+  function renderFundsTxDelete(state) {
+    const api = fundsApi();
+    const funds = api ? api.loadAndPersist() : null;
+    const row = funds && api ? api.transactions(funds).find((item) => item.id === state.entryId) : null;
+    const money = api && api.formatMoney ? api.formatMoney : (n) => "$" + n;
+    const summary = row
+      ? money(row.amount) + (row.label ? "  " + row.label : "") + (row.ts ? "  ·  " + api.formatTime(row.ts) : "")
+      : "That transaction is gone.";
+    return screen([
+      header("Daily funds", "Delete", "Remove this transaction from today"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "step-body", text: summary }),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "confirm-delete-tx",
+            onClick: () => {
+              if (!api || !row) {
+                navigate({ screen: "funds-transactions" }, { push: false });
+                return;
+              }
+              const result = api.deleteEntry(api.loadAndPersist(), row.id);
+              if (result.ok) api.save(result.data);
+              navigate({ screen: "funds-transactions", notice: result.ok ? "Deleted." : result.message, noticeKind: result.ok ? "ok" : "error" }, { push: false });
+            },
+          },
+          "Delete"
+        ),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "funds-transactions" }, { push: false }) }, "Back"),
+      ]),
+    ]);
+  }
+
+  function renderFundsReset(state, kind) {
+    const day = kind === "day";
+    return screen([
+      header("Daily funds", day ? "Reset today" : "Reset daily amount", day ? "Clear spent and transactions" : "Transactions stay"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "step-body", text: day
+          ? "This clears today's spent total and transaction list. The daily amount stays. Midnight also starts a fresh day."
+          : "This clears the daily amount only. Today's transactions and spent total stay." }),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: day ? "confirm-reset-day" : "confirm-reset-budget",
+            onClick: () => {
+              const api = fundsApi();
+              if (!api) return;
+              const result = day ? api.resetDay(api.loadAndPersist()) : api.resetBudget(api.loadAndPersist());
+              if (result.ok) api.save(result.data);
+              navigate({ screen: "funds-home", notice: day ? "Today was reset." : "Daily amount cleared.", noticeKind: "ok" }, { push: false });
+            },
+          },
+          "Reset"
+        ),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "funds-home" }, { push: false }) }, "Back"),
+      ]),
+    ]);
+  }
+
+  function timerApi() {
+    return window.WorldStaticTimer || null;
+  }
+
+  function notesApi() {
+    return window.WorldStaticNotes || null;
+  }
+
+  let timerTick = null;
+
+  function stopTimerTick() {
+    if (timerTick) {
+      clearInterval(timerTick);
+      timerTick = null;
+    }
+  }
+
+  function persistTimer(data) {
+    const api = timerApi();
+    if (!api) return null;
+    return api.save(data);
+  }
+
+  function loadTimer() {
+    const api = timerApi();
+    return api ? api.load() : null;
+  }
+
+  function isTimerDone(data) {
+    const api = timerApi();
+    return api ? api.isDone(data) : false;
+  }
+
+  function timerStatusText(data) {
+    if (!data) return "";
+    if (data.mode === "focus") {
+      const phase = data.focusPhase === "break" ? "Break" : "Focus";
+      const done = data.focusSessions ? data.focusSessions + (data.focusSessions === 1 ? " session today" : " sessions today") : "No sessions yet today";
+      if (data.running) return phase + "  ·  " + done;
+      return (isTimerDone(data) ? phase + " done" : phase + " paused") + "  ·  " + done;
+    }
+    if (data.mode === "countdown") {
+      if (isTimerDone(data)) return "Done";
+      return data.running ? "Counting down" : "Paused";
+    }
+    return data.running ? "Running" : "Paused";
+  }
+
+  function paintTimerReadout() {
+    const api = timerApi();
+    if (!api) return;
+    let data = api.snapshot(loadTimer());
+    if (data.mode === "focus" && api.isDone(data)) {
+      data = persistTimer(api.completeFocus(data));
+    }
+    const next = api.snapshot(loadTimer());
+    const clock = document.getElementById("timer-readout");
+    const status = document.getElementById("timer-status");
+    const toggle = document.getElementById("timer-toggle");
+    const title = document.querySelector(".focus-screen .screen-header h1, .timer-run-screen .screen-header h1");
+    if (clock) clock.textContent = api.formatClock(api.displayMs(next));
+    if (status) status.textContent = timerStatusText(next);
+    if (toggle) toggle.textContent = next.running ? "Pause" : api.isDone(next) ? "Restart" : "Start";
+    if (title && next.mode === "focus") title.textContent = next.focusPhase === "break" ? "Break" : "Focus";
+  }
+
+  function startTimerTick() {
+    stopTimerTick();
+    paintTimerReadout();
+    timerTick = setInterval(paintTimerReadout, 250);
+  }
+
+  function openTimerMode(mode) {
+    const api = timerApi();
+    if (!api) return;
+    persistTimer(api.setMode(loadTimer(), mode));
+    navigate({ screen: mode === "focus" ? "focus" : "timer-run", mode: mode });
+  }
+
+  function renderTimerHome() {
+    return screen([
+      header("Timer", "Choose a mode", "Kept on this device"),
+      el("div", { className: "content stack" }, [
+        el("button", { type: "button", className: "tile primary", id: "open-stopwatch", onClick: () => openTimerMode("stopwatch") }, [
+          el("span", { className: "tile-title", text: "Stopwatch" }),
+          el("span", { className: "tile-sub", text: "Count up" }),
+        ]),
+        el("button", { type: "button", className: "tile", id: "open-countdown", onClick: () => navigate({ screen: "timer-run", mode: "countdown", picking: true }) }, [
+          el("span", { className: "tile-title", text: "Countdown" }),
+          el("span", { className: "tile-sub", text: "5, 10, 15, 25, or custom minutes" }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [homeButton()]),
+    ], "timer-screen");
+  }
+
+  function renderTimerCustom(state) {
+    const value = state && state.minutes != null ? String(state.minutes) : "";
+    return screen([
+      header("Timer", "Custom countdown", "One field at a time"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "timer-minutes", text: "Minutes" }),
+          el("input", {
+            id: "timer-minutes",
+            type: "search",
+            name: "timer-minutes",
+            value: value,
+            attrs: { enterkeyhint: "done", inputmode: "numeric", spellcheck: "false" },
+          }),
+        ]),
+        state && state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: "error" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "save-timer-minutes", onClick: submitTimerCustom }, "Start"),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "timer-run", mode: "countdown", picking: true }, { push: false }) }, "Back"),
+      ]),
+    ]);
+  }
+
+  function submitTimerCustom() {
+    const api = timerApi();
+    const minutes = ((document.getElementById("timer-minutes") || {}).value || "").trim();
+    if (!api) return;
+    const result = api.setCountdown(loadTimer(), minutes);
+    if (!result.ok) {
+      navigate({ screen: "timer-custom", minutes, notice: result.message }, { push: false });
+      return;
+    }
+    persistTimer(api.start(result.data));
+    navigate({ screen: "timer-run", mode: "countdown" }, { push: false });
+  }
+
+  function renderTimerRun(state) {
+    const api = timerApi();
+    let data = loadTimer();
+    if (!api || !data) {
+      return screen([header("Timer", "Unavailable", ""), el("div", { className: "content" }), el("div", { className: "footer" }, [homeButton()])]);
+    }
+    const picking = Boolean(state && state.picking);
+    if (picking) {
+      const presets = api.COUNTDOWN_PRESETS || [5, 10, 15, 25];
+      return screen([
+        header("Timer", "Countdown", "Pick a length"),
+        el("div", { className: "content stack" }, presets.map((mins) =>
+          el(
+            "button",
+            {
+              type: "button",
+              className: "tile",
+              id: "timer-preset-" + mins,
+              onClick: () => {
+                persistTimer(api.start(api.setCountdown(loadTimer(), mins).data));
+                navigate({ screen: "timer-run", mode: "countdown" }, { push: false });
+              },
+            },
+            [el("span", { className: "tile-title", text: mins + " minutes" })]
+          )
+        ).concat([
+          el("button", { type: "button", className: "tile", id: "open-timer-custom", onClick: () => navigate({ screen: "timer-custom" }) }, [
+            el("span", { className: "tile-title", text: "Custom" }),
+          ]),
+        ])),
+        el("div", { className: "footer" }, [
+          el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "timer" }, { push: false }) }, "Back"),
+          homeButton(),
+        ]),
+      ], "timer-screen");
+    }
+    data = api.snapshot(data);
+    const title = data.mode === "countdown" ? "Countdown" : "Stopwatch";
+    return screen([
+      header("Timer", title, data.mode === "countdown" ? "Count down" : "Count up"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "timer-readout", id: "timer-readout", text: api.formatClock(api.displayMs(data)) }),
+        el("p", { className: "hint", id: "timer-status", text: timerStatusText(data) }),
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "timer-toggle", onClick: () => { persistTimer(api.toggle(loadTimer())); paintTimerReadout(); } }, data.running ? "Pause" : isTimerDone(data) ? "Restart" : "Start"),
+        el("button", { type: "button", className: "secondary", id: "timer-reset", onClick: () => { persistTimer(api.reset(loadTimer())); paintTimerReadout(); } }, "Reset"),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "timer" }, { push: false }) }, "Back"),
+        homeButton(),
+      ]),
+    ], "timer-run-screen");
+  }
+
+  function renderFocus() {
+    const api = timerApi();
+    let data = loadTimer();
+    if (!api || !data) {
+      return screen([header("Focus", "Unavailable", ""), el("div", { className: "content" }), el("div", { className: "footer" }, [homeButton()])]);
+    }
+    if (data.mode !== "focus") data = persistTimer(api.setMode(data, "focus"));
+    if (api.isDone(data)) data = persistTimer(api.completeFocus(data));
+    data = api.snapshot(data);
+    const phase = data.focusPhase === "break" ? "Break" : "Focus";
+    return screen([
+      header("Focus", phase, data.focusPhase === "break" ? "5 minutes off" : "25 minutes on"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "timer-readout", id: "timer-readout", text: api.formatClock(api.displayMs(data)) }),
+        el("p", { className: "hint", id: "timer-status", text: timerStatusText(data) }),
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "timer-toggle", onClick: () => { persistTimer(api.toggle(loadTimer())); paintTimerReadout(); } }, data.running ? "Pause" : "Start"),
+        el("button", { type: "button", className: "secondary", id: "timer-skip", onClick: () => { persistTimer(api.skipPhase(loadTimer())); navigate({ screen: "focus" }, { push: false }); } }, "Skip"),
+        el("button", { type: "button", className: "secondary", id: "timer-reset", onClick: () => { persistTimer(api.reset(loadTimer())); navigate({ screen: "focus" }, { push: false }); } }, "Reset"),
+        homeButton(),
+      ]),
+    ], "focus-screen");
+  }
+
+  function loadNotes() {
+    const api = notesApi();
+    return api ? api.load() : { notes: [] };
+  }
+
+  function persistNotes(data) {
+    const api = notesApi();
+    return api ? api.save(data) : data;
+  }
+
+  function renderNotes(state) {
+    const api = notesApi();
+    const data = loadNotes();
+    const notes = api ? api.list(data) : [];
+    const timeFn = fundsApi() && fundsApi().formatTime ? fundsApi().formatTime : function () { return ""; };
+    const list = notes.length
+      ? notes.map((note, index) =>
+          el(
+            "button",
+            {
+              type: "button",
+              className: "tile",
+              id: "note-item-" + index,
+              onClick: () => navigate({ screen: "notes-detail", noteId: note.id }),
+            },
+            [
+              el("span", { className: "tile-title", text: note.text }),
+              el("span", { className: "tile-sub", text: timeFn(note.ts) }),
+            ]
+          )
+        )
+      : [el("p", { className: "hint", text: "No notes yet. Pinch New note and dictate." })];
+    return screen([
+      header("Notes", "Scratch pad", "Stays on this device"),
+      el("div", { className: "content stack" }, [
+        state && state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
+        el("div", { className: "stack", attrs: { role: "list" } }, list),
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "open-new-note", onClick: () => navigate({ screen: "notes-new", text: "" }) }, "New note"),
+        homeButton(),
+      ]),
+    ], "notes-screen");
+  }
+
+  function renderNotesNew(state) {
+    const value = state && state.text != null ? String(state.text) : "";
+    return screen([
+      header("Notes", "New note", "One field  ·  dictate or type"),
+      el("div", { className: "content stack" }, [
+        el("div", { className: "field-wrap stack" }, [
+          el("label", { htmlFor: "note-text", text: "Note" }),
+          el("input", {
+            id: "note-text",
+            type: "search",
+            name: "note-text",
+            value: value,
+            attrs: { enterkeyhint: "done", spellcheck: "false", autocomplete: "off" },
+          }),
+        ]),
+        state && state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: "error" } }) : null,
+      ]),
+      el("div", { className: "footer" }, [
+        el("button", { type: "button", className: "secondary primary", id: "save-note", onClick: submitNewNote }, "Save"),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "notes" }, { push: false }) }, "Back"),
+      ]),
+    ]);
+  }
+
+  function submitNewNote() {
+    const api = notesApi();
+    const text = liveFieldValue("note-text", (currentState() && currentState().text) || "");
+    if (!api) return;
+    const result = api.addNote(loadNotes(), text);
+    if (!result.ok) {
+      navigate({ screen: "notes-new", text, notice: result.message }, { push: false });
+      return;
+    }
+    persistNotes(result.data);
+    navigate({ screen: "notes", notice: "Saved on this device.", noticeKind: "ok" }, { push: false });
+  }
+
+  function renderNotesDetail(state) {
+    const api = notesApi();
+    const note = api ? api.noteById(loadNotes(), state && state.noteId) : null;
+    const timeFn = fundsApi() && fundsApi().formatTime ? fundsApi().formatTime : function () { return ""; };
+    return screen([
+      header("Notes", "Note", note ? timeFn(note.ts) : "Not found"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "step-body", text: note ? note.text : "That note is gone." }),
+      ]),
+      el("div", { className: "footer" }, [
+        note
+          ? el("button", { type: "button", className: "secondary primary", id: "open-delete-note", onClick: () => navigate({ screen: "notes-delete", noteId: note.id }) }, "Delete")
+          : null,
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "notes" }, { push: false }) }, "Back"),
+        homeButton(),
+      ]),
+    ]);
+  }
+
+  function renderNotesDelete(state) {
+    const api = notesApi();
+    const note = api ? api.noteById(loadNotes(), state && state.noteId) : null;
+    return screen([
+      header("Notes", "Delete", "Remove this note from the device"),
+      el("div", { className: "content stack" }, [
+        el("p", { className: "step-body", text: note ? note.text : "That note is gone." }),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "confirm-delete-note",
+            onClick: () => {
+              if (!api || !note) {
+                navigate({ screen: "notes" }, { push: false });
+                return;
+              }
+              const result = api.deleteNote(loadNotes(), note.id);
+              if (result.ok) persistNotes(result.data);
+              navigate({ screen: "notes", notice: "Deleted.", noticeKind: "ok" }, { push: false });
+            },
+          },
+          "Delete"
+        ),
+        el("button", { type: "button", className: "secondary", id: "go-back", onClick: () => navigate({ screen: "notes-detail", noteId: state.noteId }, { push: false }) }, "Back"),
+      ]),
+    ]);
+  }
+
+
   function render(state) {
     const screenName = state && state.screen ? state.screen : "home";
     const prevFocusId = document.activeElement && document.activeElement.id ? document.activeElement.id : "";
     const sameScreen = renderedScreen === screenName;
     if (screenName !== "home") stopClock();
+    if (screenName !== "timer-run" && screenName !== "focus") stopTimerTick();
     if (screenName !== "prompter-play") {
       stopPrompterAnim();
       prompterPlay = null;
@@ -4607,7 +5370,13 @@
         break;
       case "tasks":
         view = renderTasks(state);
-        lastFocusSelector = "#selected-task, #open-new-task";
+        lastFocusSelector = state && Number.isFinite(state.taskIndex)
+          ? "#task-item-" + state.taskIndex + ", #open-new-task"
+          : "#task-item-0, #open-new-task";
+        break;
+      case "tasks-detail":
+        view = renderTaskDetail(state);
+        lastFocusSelector = "#task-check-0, #toggle-task-done, #go-back";
         break;
       case "tasks-actions":
         view = renderTaskActions(state);
@@ -4660,7 +5429,7 @@
         break;
       case "prompter-play":
         view = renderPrompterPlay(state);
-        lastFocusSelector = "#go-back";
+        lastFocusSelector = "#prompter-stage, #go-back";
         break;
       case "apps":
         view = renderApps();
@@ -4674,9 +5443,61 @@
         view = renderFundsEntry(state);
         lastFocusSelector = fundsStep(state) === "label" ? "#funds-label" : "#funds-amount";
         break;
+      case "funds-home":
+        view = renderFundsHome(state);
+        lastFocusSelector = "#open-add-spend";
+        break;
       case "funds-budget":
         view = renderFundsBudget(state);
         lastFocusSelector = "#funds-budget";
+        break;
+      case "funds-transactions":
+        view = renderFundsTransactions(state);
+        lastFocusSelector = "#funds-tx-0, #go-back";
+        break;
+      case "funds-tx-delete":
+        view = renderFundsTxDelete(state);
+        lastFocusSelector = "#confirm-delete-tx";
+        break;
+      case "funds-reset-day":
+        view = renderFundsReset(state, "day");
+        lastFocusSelector = "#confirm-reset-day";
+        break;
+      case "funds-reset-budget":
+        view = renderFundsReset(state, "budget");
+        lastFocusSelector = "#confirm-reset-budget";
+        break;
+      case "timer":
+        view = renderTimerHome(state);
+        lastFocusSelector = "#open-stopwatch";
+        break;
+      case "timer-run":
+        view = renderTimerRun(state);
+        lastFocusSelector = "#timer-toggle";
+        break;
+      case "timer-custom":
+        view = renderTimerCustom(state);
+        lastFocusSelector = "#timer-minutes";
+        break;
+      case "focus":
+        view = renderFocus(state);
+        lastFocusSelector = "#timer-toggle";
+        break;
+      case "notes":
+        view = renderNotes(state);
+        lastFocusSelector = "#open-new-note, #note-item-0, #go-home";
+        break;
+      case "notes-new":
+        view = renderNotesNew(state);
+        lastFocusSelector = "#note-text";
+        break;
+      case "notes-detail":
+        view = renderNotesDetail(state);
+        lastFocusSelector = "#go-back";
+        break;
+      case "notes-delete":
+        view = renderNotesDelete(state);
+        lastFocusSelector = "#confirm-delete-note";
         break;
       case "next-up":
         view = renderNextUpEditor(state);
@@ -4689,12 +5510,13 @@
     app.append(view);
     renderedScreen = screenName;
     if (screenName === "home") startClock();
+    if (screenName === "timer-run" || screenName === "focus") startTimerTick();
     if (screenName === "prompter-play" && prompterPlay) {
       const scroll = document.getElementById("prompter-scroll");
       if (scroll) scroll.style.fontSize = prompterPlay.fontSize + "px";
       window.requestAnimationFrame(() => {
         updatePrompterChrome(prompterPlay);
-        startPrompterAnim();
+        if (!prompterPlay || prompterPlay.mode !== "slides") startPrompterAnim();
       });
     }
     let target = null;
@@ -4878,16 +5700,39 @@
     const screenName = state && state.screen;
     const id = event && event.target && event.target.id;
     const name = nav && nav.name;
-    if (screenName === "prompter-play" && !isTypingTarget(event.target)) return true;
+    if (screenName === "prompter-play" && !isTypingTarget(event.target) && id !== "go-back") return true;
+    if ((screenName === "tasks" || screenName === "tasks-detail") && !isTypingTarget(event.target)) return true;
     if (screenName === "scale-convert" && id === "scale-value-panel") return true;
     if (screenName === "recipe" && id === "step-panel" && (name === "left" || name === "right")) return true;
     if (screenName === "scale-category" && id === "scale-entry-panel" && (name === "left" || name === "right")) return true;
     return false;
   }
 
+  function moveTaskScreenFocus(state, nav, current) {
+    const api = focusNavApi();
+    const spatial = (nav && nav.spatial) || (nav && nav.dir > 0 ? "down" : "up");
+    if (state && state.screen === "tasks-detail") {
+      const checks = app.querySelectorAll(".task-check");
+      const ids = api && api.taskDetailIds ? api.taskDetailIds(checks.length) : [];
+      const currentId = current && current.id ? current.id : (ids[0] || "");
+      const nextId = api && api.stepIds ? api.stepIds(ids, currentId, nav.dir, true) : "";
+      return focusNode(document.getElementById(nextId));
+    }
+    const cards = app.querySelectorAll(".screen .task-item");
+    const currentId = current && current.id ? current.id : "task-item-0";
+    const nextId = api && api.taskScreenNext ? api.taskScreenNext(currentId, spatial, cards.length) : "";
+    return focusNode(document.getElementById(nextId));
+  }
+
   function handleDirectionalMove(event, nav) {
     if (!nav || !nav.dir) return false;
     const state = currentState();
+    if (state && (state.screen === "tasks" || state.screen === "tasks-detail") && !isTypingTarget(event.target)) {
+      event.preventDefault();
+      if (typeof event.stopPropagation === "function") event.stopPropagation();
+      moveTaskScreenFocus(state, nav, event.target);
+      return true;
+    }
     if (ownsCustomArrows(state, event, nav)) return false;
     /* Wheel on a button should still scroll the page. Arrows are intercepted
        so type=search fields stay in the same focus order as buttons. */
@@ -4911,7 +5756,6 @@
     if (index < 0) return;
     list.forEach((el, i) => {
       el.classList.toggle("is-selected", i === index);
-      el.id = i === index ? "selected-task" : "task-item-" + i;
     });
     try {
       history.replaceState(
@@ -4936,6 +5780,22 @@
     const navApi = focusNavApi();
     const nav = navApi && typeof navApi.normalizeNav === "function" ? navApi.normalizeNav(event) : null;
     const keyIsEnter = Boolean(nav && nav.activate);
+    const evKey = event && (event.key || event.code);
+    if (evKey === "Escape" || evKey === "Esc" || event.keyCode === 27) {
+      event.preventDefault();
+      goBack();
+      return;
+    }
+    if (keyIsEnter && event.target && event.target.id === "save-note") {
+      event.preventDefault();
+      submitNewNote();
+      return;
+    }
+    if (keyIsEnter && event.target && event.target.id === "save-timer-minutes") {
+      event.preventDefault();
+      submitTimerCustom();
+      return;
+    }
     if (keyIsEnter && event.target && event.target.id === "question") {
       event.preventDefault();
       submitQuestion();
@@ -5038,6 +5898,27 @@
     }
     if (isTypingTarget(event.target)) return;
     if (state && state.screen === "prompter-play") {
+      const id = event.target && event.target.id;
+      const slides = prompterPlay && prompterPlay.mode === "slides";
+      if (slides) {
+        if (id === "go-back") return;
+        if (keyIsEnter) {
+          event.preventDefault();
+          if (!stepPrompterSlide(1)) focusNode(document.getElementById("go-back"));
+          return;
+        }
+        if (nav && (nav.name === "right" || nav.name === "down")) {
+          event.preventDefault();
+          if (!stepPrompterSlide(1)) focusNode(document.getElementById("go-back"));
+          return;
+        }
+        if (nav && (nav.name === "left" || nav.name === "up")) {
+          event.preventDefault();
+          stepPrompterSlide(-1);
+          return;
+        }
+        return;
+      }
       if (keyIsEnter) {
         event.preventDefault();
         togglePrompterPause();

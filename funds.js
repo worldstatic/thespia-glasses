@@ -70,6 +70,7 @@
     if (amount == null || amount <= 0) return null;
     const ts = Number(item.ts) || 0;
     return {
+      id: String(item.id || ("entry-" + ts + "-" + amount)),
       amount,
       label: String(item.label || "").trim().slice(0, LABEL_MAX),
       ts,
@@ -134,10 +135,12 @@
     if (value == null || value <= 0) {
       return { ok: false, message: "Enter an amount.", data: current };
     }
+    const ts = (now || new Date()).getTime();
     const entry = {
+      id: "entry-" + ts + "-" + value,
       amount: value,
       label: String(label || "").trim().slice(0, LABEL_MAX),
-      ts: (now || new Date()).getTime(),
+      ts,
     };
     const spent = Math.round((current.spent + value) * 100) / 100;
     return {
@@ -154,9 +157,49 @@
     const current = rollover(data, now);
     const value = parseAmount(amount);
     if (value == null) {
-      return { ok: false, message: "Enter a daily budget.", data: current };
+      return { ok: false, message: "Enter a daily amount.", data: current };
     }
     return { ok: true, data: { ...current, budget: value } };
+  }
+
+  function spentFromEntries(entries) {
+    const sum = (entries || []).reduce((total, row) => total + (Number(row.amount) || 0), 0);
+    return Math.round(sum * 100) / 100;
+  }
+
+  function transactions(data) {
+    const current = normalize(data);
+    return current.entries.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  }
+
+  function formatTime(ts) {
+    const date = new Date(Number(ts) || 0);
+    if (!Number.isFinite(date.getTime()) || date.getTime() <= 0) return "";
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const suffix = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return hours + ":" + minutes + " " + suffix;
+  }
+
+  function deleteEntry(data, entryId, now) {
+    const current = rollover(data, now);
+    const id = String(entryId || "");
+    const nextEntries = current.entries.filter((row) => row.id !== id);
+    if (nextEntries.length === current.entries.length) {
+      return { ok: false, message: "That transaction is gone.", data: current };
+    }
+    return { ok: true, data: { ...current, entries: nextEntries, spent: spentFromEntries(nextEntries) } };
+  }
+
+  function resetDay(data, now) {
+    const current = rollover(data, now);
+    return { ok: true, data: { ...current, spent: 0, entries: [] } };
+  }
+
+  function resetBudget(data, now) {
+    const current = rollover(data, now);
+    return { ok: true, data: { ...current, budget: 0 } };
   }
 
   function load(storage, now) {
@@ -208,6 +251,11 @@
     rollover,
     addSpend,
     setBudget,
+    transactions,
+    formatTime,
+    deleteEntry,
+    resetDay,
+    resetBudget,
     load,
     save,
     loadAndPersist,

@@ -12,7 +12,7 @@
   "use strict";
 
   const TASK_FOOTER_IDS = ["open-new-task", "open-task-actions", "open-task-lists", "go-home"];
-  const APP_VERSION = "v15";
+  const APP_VERSION = "v16";
 
   function isDisabled(el) {
     return Boolean(el && (el.disabled || el.getAttribute("aria-disabled") === "true"));
@@ -266,6 +266,78 @@
     return { action: "none" };
   }
 
+  function taskCardIds(count) {
+    const ids = [];
+    const n = Math.max(0, Number(count) || 0);
+    for (let i = 0; i < n; i += 1) ids.push("task-item-" + i);
+    return ids.concat(TASK_FOOTER_IDS);
+  }
+
+  function footerGridNext(currentId, spatial) {
+    const grid = [
+      ["open-new-task", "open-task-actions"],
+      ["open-task-lists", "go-home"],
+    ];
+    let row = -1;
+    let col = -1;
+    for (let r = 0; r < 2; r += 1) {
+      const c = grid[r].indexOf(currentId);
+      if (c >= 0) {
+        row = r;
+        col = c;
+        break;
+      }
+    }
+    if (row < 0) return null;
+    if (spatial === "right") {
+      if (col < 1) return grid[row][1];
+      return row === 0 ? grid[1][0] : null;
+    }
+    if (spatial === "left") {
+      if (col > 0) return grid[row][0];
+      return row === 1 ? grid[0][1] : null;
+    }
+    if (spatial === "down") {
+      if (row === 0) return grid[1][col];
+      return null;
+    }
+    if (spatial === "up") {
+      if (row === 1) return grid[0][col];
+      return null;
+    }
+    return null;
+  }
+
+  function taskScreenNext(currentId, spatial, taskCount) {
+    const cards = [];
+    const n = Math.max(0, Number(taskCount) || 0);
+    for (let i = 0; i < n; i += 1) cards.push("task-item-" + i);
+    const dir = spatial === "up" || spatial === "left" ? -1 : 1;
+    const cardIndex = cards.indexOf(currentId);
+    if (cardIndex >= 0) {
+      const next = cardIndex + dir;
+      if (next >= 0 && next < cards.length) return cards[next];
+      if (dir > 0) return TASK_FOOTER_IDS[0];
+      return TASK_FOOTER_IDS[TASK_FOOTER_IDS.length - 1];
+    }
+    const inFooter = TASK_FOOTER_IDS.indexOf(currentId) >= 0;
+    if (inFooter) {
+      const gridNext = footerGridNext(currentId, spatial || (dir > 0 ? "down" : "up"));
+      if (gridNext) return gridNext;
+      if (dir < 0 || spatial === "up") return cards.length ? cards[cards.length - 1] : TASK_FOOTER_IDS[0];
+      return cards.length ? cards[0] : TASK_FOOTER_IDS[0];
+    }
+    return cards[0] || TASK_FOOTER_IDS[0];
+  }
+
+  function taskDetailIds(checkCount) {
+    const ids = [];
+    const n = Math.max(0, Number(checkCount) || 0);
+    for (let i = 0; i < n; i += 1) ids.push("task-check-" + i);
+    ids.push("toggle-task-done", "edit-task", "go-back", "go-home");
+    return ids;
+  }
+
   function taskArrow(model, key) {
     /* Linear walk used by tests: cards then the bottom bar, wrapping at the ends. */
     const footerIds = (model && model.footerIds) || TASK_FOOTER_IDS;
@@ -314,6 +386,10 @@
     prevFormStep: prevFormStep,
     fundsEnter: fundsEnter,
     taskArrow: taskArrow,
+    taskCardIds: taskCardIds,
+    taskScreenNext: taskScreenNext,
+    taskDetailIds: taskDetailIds,
+    footerGridNext: footerGridNext,
     talkDefaultFocus: talkDefaultFocus,
   };
 

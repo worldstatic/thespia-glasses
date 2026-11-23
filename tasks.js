@@ -426,6 +426,28 @@
     return { ok: true, task: found.task, list: found.list, data };
   }
 
+  function syncTaskDoneFromItems(task) {
+    if (!task || !Array.isArray(task.items) || !task.items.length) return task;
+    task.done = task.items.every((item) => item && item.done);
+    return task;
+  }
+
+  function toggleItem(data, taskId, itemId) {
+    const found = taskById(data, taskId);
+    if (!found || !found.task) return { ok: false, message: "Task not found." };
+    const items = found.task.items || [];
+    const id = String(itemId || "");
+    let item = items.find((row) => row.id === id);
+    if (!item) {
+      const index = Number(id);
+      if (Number.isFinite(index) && items[index]) item = items[index];
+    }
+    if (!item) return { ok: false, message: "That checklist item is gone.", task: found.task, list: found.list, data };
+    item.done = !item.done;
+    syncTaskDoneFromItems(found.task);
+    return { ok: true, task: found.task, item: item, list: found.list, data };
+  }
+
   function deleteTask(data, taskId) {
     const found = taskById(data, taskId);
     if (!found) return { ok: false, message: "Task not found." };
@@ -535,6 +557,7 @@
     addTask,
     updateTask,
     toggleTask,
+    toggleItem,
     deleteTask,
     moveTask,
     moveTaskBy,

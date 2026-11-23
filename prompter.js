@@ -108,6 +108,75 @@
     return segments;
   }
 
+  const PLAY_MODES = ["scroll", "slides"];
+
+  function normalizePlayMode(value) {
+    return value === "slides" ? "slides" : "scroll";
+  }
+
+  function slideCapacity(fontSize) {
+    const size = clampFontSize(fontSize);
+    const maxWidth = 520;
+    const maxHeight = 340;
+    const lineHeight = size * 1.25;
+    const maxLines = Math.max(3, Math.floor(maxHeight / lineHeight));
+    const charsPerLine = Math.max(12, Math.floor(maxWidth / (size * 0.58)));
+    return { maxLines, charsPerLine, maxChars: maxLines * charsPerLine };
+  }
+
+  function splitParagraph(text, maxChars) {
+    const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const chunks = [];
+    let buf = [];
+    let len = 0;
+    for (let i = 0; i < words.length; i += 1) {
+      const word = words[i];
+      const add = (buf.length ? 1 : 0) + word.length;
+      if (len + add > maxChars && buf.length) {
+        chunks.push(buf.join(" "));
+        buf = [word];
+        len = word.length;
+      } else {
+        buf.push(word);
+        len += add;
+      }
+    }
+    if (buf.length) chunks.push(buf.join(" "));
+    return chunks;
+  }
+
+  function splitSlides(body, fontSize) {
+    const cap = slideCapacity(fontSize);
+    const raw = String(body || "").replace(/\r\n/g, "\n").trim();
+    if (!raw) return [];
+    const segments = parseSegments(raw);
+    const source = segments.length ? segments : [{ title: "", text: raw, body: raw }];
+    const slides = [];
+    for (let s = 0; s < source.length; s += 1) {
+      const seg = source[s];
+      const text = String(seg.text || seg.body || "").trim();
+      const paragraphs = text
+        ? text.split(/\n\s*\n/).map((part) => part.replace(/\n+/g, " ").trim()).filter(Boolean)
+        : [];
+      const parts = paragraphs.length ? paragraphs : text ? [text.replace(/\n+/g, " ").trim()] : [];
+      let first = true;
+      if (!parts.length && seg.title) {
+        slides.push({ title: seg.title, text: "" });
+        continue;
+      }
+      for (let p = 0; p < parts.length; p += 1) {
+        const chunks = splitParagraph(parts[p], cap.maxChars);
+        for (let c = 0; c < chunks.length; c += 1) {
+          const title = first && seg.title && seg.title !== "Script" ? seg.title : "";
+          slides.push({ title: title, text: chunks[c] });
+          first = false;
+        }
+      }
+    }
+    return slides;
+  }
+
   function formatTimer(seconds) {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
     const hours = Math.floor(total / 3600);
@@ -177,7 +246,7 @@
   }
 
   function emptyData() {
-    return { version: 1, fontSize: 36, speed: 28, scripts: [] };
+    return { version: 1, fontSize: 36, speed: 28, playMode: "scroll", scripts: [] };
   }
 
   function seedData() {
@@ -200,6 +269,7 @@
       version: 1,
       fontSize: clampFontSize(parsed.fontSize),
       speed: clampSpeed(parsed.speed),
+      playMode: normalizePlayMode(parsed.playMode),
       scripts,
     };
   }
@@ -277,6 +347,11 @@
   function setSpeed(data, value) {
     data.speed = clampSpeed(value);
     return data.speed;
+  }
+
+  function setPlayMode(data, mode) {
+    data.playMode = normalizePlayMode(mode);
+    return data.playMode;
   }
 
   function nudgeFontSize(data, direction) {
@@ -357,10 +432,14 @@
     BODY_MAX,
     FONT_SIZES,
     SPEEDS,
+    PLAY_MODES,
     DEFAULT_SCRIPT_BODY,
     parseDuration,
     parseSegmentHeading,
     parseSegments,
+    normalizePlayMode,
+    slideCapacity,
+    splitSlides,
     formatTimer,
     clampFontSize,
     clampSpeed,
@@ -378,6 +457,7 @@
     deleteScript,
     setFontSize,
     setSpeed,
+    setPlayMode,
     nudgeFontSize,
     nudgeSpeed,
     exportBlob,

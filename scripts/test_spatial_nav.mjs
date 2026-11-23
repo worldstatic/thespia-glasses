@@ -157,7 +157,7 @@ async function main() {
     await page.waitForSelector("#open-apps", { timeout: 15000 });
 
     const version = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (version !== "v15") failures.push("Home version label should read v15, got " + version);
+    if (version !== "v16") failures.push("Home version label should read v16, got " + version);
 
     const homeIds = await reachableByArrows(page);
     const homeMissing = missing(homeIds, ["open-funds", "open-next-up", "open-current-task", "open-talk-preview", "open-apps"]);
@@ -166,7 +166,7 @@ async function main() {
     await page.click("#open-apps");
     await page.waitForSelector("#open-task-cards");
     const appsVersion = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (appsVersion !== "v15") failures.push("Apps version label should read v15, got " + appsVersion);
+    if (appsVersion !== "v16") failures.push("Apps version label should read v16, got " + appsVersion);
 
     await page.click("#open-task-cards");
     await page.waitForSelector("#open-new-task");
@@ -175,11 +175,70 @@ async function main() {
     const taskMissing = missing(taskIds, ["open-new-task", "open-task-actions", "open-task-lists", "go-home"]);
     if (!hasCard) failures.push("Task Cards arrows never reached a task card (reached " + taskIds.join(", ") + ")");
     if (taskMissing.length) failures.push("Task Cards arrows missed " + taskMissing.join(", ") + " (reached " + taskIds.join(", ") + ")");
+    if (taskIds.includes("selected-task")) failures.push("Task Cards must use stable task-item-N ids, not selected-task");
+    if (taskIds.includes("task-list-prev") || taskIds.includes("task-list-next")) {
+      failures.push("Prev/Next list controls should not sit in the Task Cards focus path");
+    }
+
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("thespia.hud.tasks");
+      const data = raw ? JSON.parse(raw) : { version: 1, lists: [] };
+      const list = (data.lists || []).find((row) => row.id === "work") || (data.lists || [])[0];
+      if (list) {
+        const stamp = Date.now();
+        list.tasks = [
+          { id: "t-a", title: "Card Alpha", note: "", done: false, items: [{ id: "i-a1", text: "First bullet", done: false }, { id: "i-a2", text: "Second bullet", done: false }] },
+          { id: "t-b", title: "Card Bravo", note: "", done: false, items: [] },
+          { id: "t-c", title: "Card Charlie", note: "", done: false, items: [] },
+        ];
+        localStorage.setItem("thespia.hud.tasks", JSON.stringify(data));
+      }
+    });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.waitForSelector("#open-task-cards");
+    await page.click("#open-task-cards");
+    await page.waitForSelector("#task-item-0");
+    await page.focus("#task-item-0");
+    const walk = ["task-item-0"];
+    for (let i = 0; i < 4; i += 1) {
+      await press(page, "ArrowDown");
+      walk.push(await currentId(page));
+    }
+    const expectedWalk = ["task-item-0", "task-item-1", "task-item-2", "open-new-task", "open-task-lists"];
+    if (walk.join(",") !== expectedWalk.join(",")) {
+      failures.push("Task Cards Arrow Down order was " + walk.join(" -> ") + " (expected " + expectedWalk.join(" -> ") + ")");
+    }
+    await page.focus("#task-item-0");
+    await press(page, "Enter");
+    await page.waitForSelector("#task-check-0");
+    const detailIds = await reachableByArrows(page);
+    const detailMissing = missing(detailIds, ["task-check-0", "task-check-1", "toggle-task-done", "edit-task", "go-back", "go-home"]);
+    if (detailMissing.length) failures.push("Task detail arrows missed " + detailMissing.join(", ") + " (reached " + detailIds.join(", ") + ")");
+    await page.focus("#task-check-0");
+    await press(page, "Enter");
+    await new Promise((r) => setTimeout(r, 80));
+    const afterCheck = await page.evaluate(() => ({
+      id: (document.activeElement && document.activeElement.id) || "",
+      done: document.getElementById("task-check-0") && document.getElementById("task-check-0").classList.contains("is-done"),
+    }));
+    if (afterCheck.id !== "task-check-0") failures.push("Checking a bullet left focus on " + afterCheck.id);
+    if (!afterCheck.done) failures.push("Checking a bullet did not mark the first item done");
+    await page.click("#go-back");
+    await page.waitForSelector("#task-item-0");
+    const afterBack = await currentId(page);
+    if (afterBack !== "task-item-0") failures.push("Back from a card should restore focus to that card, got " + afterBack);
 
     await page.click("#go-home");
     await page.waitForSelector("#open-apps");
     await page.click("#open-apps");
+    await page.waitForSelector("#open-daily-funds");
+    await page.click("#open-daily-funds");
     await page.waitForSelector("#open-add-spend");
+    const fundsHomeIds = await reachableByArrows(page);
+    const fundsHomeMissing = missing(fundsHomeIds, ["open-add-spend", "open-transactions", "open-funds-budget", "open-reset-day", "open-reset-budget", "go-home"]);
+    if (fundsHomeMissing.length) failures.push("Daily funds hub arrows missed " + fundsHomeMissing.join(", ") + " (reached " + fundsHomeIds.join(", ") + ")");
     await page.click("#open-add-spend");
     await page.waitForSelector("#funds-amount");
     const amountCount = await page.$$eval('input[type="search"]', (els) => els.length);
@@ -242,6 +301,113 @@ async function main() {
     }
     if (noteLanded.title != null) failures.push("New task: Title field was present while dictating the note");
 
+    await page.evaluate(() => {
+      const now = Date.now();
+      const today = new Date();
+      const day = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+      localStorage.setItem("thespia.hud.funds", JSON.stringify({
+        budget: 40,
+        day,
+        spent: 11,
+        entries: [
+          { id: "e2", amount: 8, label: "lunch", ts: now },
+          { id: "e1", amount: 3, label: "coffee", ts: now - 10000 },
+        ],
+        history: [],
+      }));
+    });
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.waitForSelector("#open-daily-funds");
+    await page.click("#open-daily-funds");
+    await page.waitForSelector("#open-transactions");
+    await page.click("#open-transactions");
+    await page.waitForSelector("#funds-tx-0");
+    const txIds = await reachableByArrows(page);
+    const txMissing = missing(txIds, ["funds-tx-0", "funds-tx-1", "go-back", "go-home"]);
+    if (txMissing.length) failures.push("Transactions arrows missed " + txMissing.join(", ") + " (reached " + txIds.join(", ") + ")");
+    const firstTx = await page.$eval("#funds-tx-0 .tile-title", (el) => el.textContent);
+    if (!/lunch/.test(firstTx)) failures.push("Transactions should list newest first, first row was " + firstTx);
+
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.waitForSelector("#open-timer");
+    await page.focus("#open-timer");
+    const appIds = await reachableByArrows(page);
+    const appMissing = missing(appIds, ["open-timer", "open-notes", "open-focus", "open-daily-funds", "open-task-cards"]);
+    if (appMissing.length) failures.push("Apps arrows missed " + appMissing.join(", ") + " (reached " + appIds.join(", ") + ")");
+    await page.click("#open-timer");
+    await page.waitForSelector("#open-stopwatch");
+    const timerIds = await reachableByArrows(page);
+    const timerMissing = missing(timerIds, ["open-stopwatch", "open-countdown", "go-home"]);
+    if (timerMissing.length) failures.push("Timer arrows missed " + timerMissing.join(", ") + " (reached " + timerIds.join(", ") + ")");
+    await page.click("#open-stopwatch");
+    await page.waitForSelector("#timer-toggle");
+    const runIds = await reachableByArrows(page);
+    const runMissing = missing(runIds, ["timer-toggle", "timer-reset", "go-back", "go-home"]);
+    if (runMissing.length) failures.push("Stopwatch arrows missed " + runMissing.join(", ") + " (reached " + runIds.join(", ") + ")");
+
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.click("#open-notes");
+    await page.waitForSelector("#open-new-note");
+    const notesIds = await reachableByArrows(page);
+    const notesMissing = missing(notesIds, ["open-new-note", "go-home"]);
+    if (notesMissing.length) failures.push("Notes arrows missed " + notesMissing.join(", ") + " (reached " + notesIds.join(", ") + ")");
+    await page.click("#open-new-note");
+    await page.waitForSelector("#note-text");
+    const noteFields = await page.$$eval('input[type="search"]', (els) => els.map((el) => el.id));
+    if (noteFields.length !== 1 || noteFields[0] !== "note-text") failures.push("New note must show exactly one search field, found " + noteFields.join(","));
+
+    await page.click("#go-back");
+    await page.waitForSelector("#open-new-note");
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.click("#open-focus");
+    await page.waitForSelector("#timer-toggle");
+    const focusIds = await reachableByArrows(page);
+    const focusMissing = missing(focusIds, ["timer-toggle", "timer-skip", "timer-reset", "go-home"]);
+    if (focusMissing.length) failures.push("Focus arrows missed " + focusMissing.join(", ") + " (reached " + focusIds.join(", ") + ")");
+
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.waitForSelector("#open-teleprompter");
+    await page.click("#open-teleprompter");
+    await page.waitForSelector("button.tile");
+    await page.click("button.tile");
+    await page.waitForSelector("#start-prompter");
+    await page.click("#prompter-mode-slides");
+    await page.waitForSelector("#prompter-mode-slides");
+    const modeOn = await page.$eval("#prompter-mode-slides", (el) => el.getAttribute("aria-pressed"));
+    if (modeOn !== "true") failures.push("Slides mode did not stay selected");
+    await page.click("#start-prompter");
+    await page.waitForSelector("#prompter-slide-count");
+    const startCount = await page.$eval("#prompter-slide-count", (el) => el.textContent.trim());
+    if (!/^1 \//.test(startCount)) failures.push("Slides should open on 1 / N, got " + startCount);
+    await page.focus("#prompter-stage");
+    await press(page, "ArrowRight");
+    const midCount = await page.$eval("#prompter-slide-count", (el) => el.textContent.trim());
+    if (midCount === startCount) failures.push("ArrowRight should advance a slide, still " + midCount);
+    const total = Number((midCount.split("/")[1] || "1").trim());
+    await page.focus("#prompter-stage");
+    for (let i = 0; i < total + 2; i += 1) await press(page, "ArrowRight");
+    const lastCount = await page.$eval("#prompter-slide-count", (el) => el.textContent.trim());
+    if (!lastCount.startsWith(String(total) + " /")) failures.push("Slides should stop at the last card, got " + lastCount);
+    await press(page, "ArrowDown");
+    const afterLast = await currentId(page);
+    if (afterLast !== "go-back") failures.push("Arrow Down on the last slide should reach Back, focus was " + afterLast);
+    const slideIds = await reachableByArrows(page);
+    if (!slideIds.includes("go-back") || !slideIds.includes("prompter-stage")) {
+      failures.push("Slides arrows must reach the stage and Back (reached " + slideIds.join(", ") + ")");
+    }
+
+    await page.click("#go-back");
+    await page.waitForSelector("#start-prompter");
     await page.click("#go-home");
     await page.waitForSelector("#open-apps");
     await seedTalk(page);

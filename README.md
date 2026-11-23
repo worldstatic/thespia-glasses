@@ -1,6 +1,6 @@
 # World Static
 
-A Meta Ray-Ban Display Web App: a glasses home screen named **World Static**, with **Task Cards**, a **Teleprompter**, **Blueprint Help** for Unreal Engine 5.6 (Blueprints only), **Scale Check**, and **Talk** (Major or C 2). Built for Thespia work, and for general use at work or home.
+A Meta Ray-Ban Display Web App: a glasses home screen named **World Static**, with **Task Cards**, a **Teleprompter**, **Daily funds**, **Timer**, **Notes**, **Focus**, **Blueprint Help** for Unreal Engine 5.6 (Blueprints only), **Scale Check**, and **Talk** (Major or C 2). Built for Thespia work, and for general use at work or home.
 
 The static site is meant to be served from the repository root on GitHub Pages (`index.html` at `/`). The optional Python server is only for local preview and AI answers; it is not required for the glasses app.
 
@@ -18,7 +18,7 @@ Keyboard stand-ins for the Neural Band / Cap Touch (thumb swipe is Up/Down/Left/
 
 - **Arrow keys** — Chromium spatial navigation moves focus to the nearest on-screen control in that direction. The same keys work here if you start Chrome with `--enable-spatial-navigation`. Up/Down also change teleprompter speed or a Scale Check converter value when that readout is focused.
 - **Tab / Shift+Tab** — move to the next or previous control (useful on a desktop keyboard)
-- **Enter** — activate the focused button, mark a task done, pause or resume the teleprompter, or submit a dictated field (Add spend: Enter in Amount moves to Label; Enter in Label or on Save adds the amount)
+- **Enter** — activate the focused button, open a task card (or check a bullet on the card), pause or resume a scrolling teleprompter, advance a teleprompter slide, or submit a dictated field (Add spend: Next after Amount, Save after Label)
 
 Optional: the [Meta Ray-Ban Display Simulator](https://wearables.developer.meta.com/docs/develop/webapps/test/) Chrome extension can preview the additive display. It is not a substitute for device testing, and it does not reproduce the composer or the Neural Band exactly.
 
@@ -35,19 +35,19 @@ That command also runs the privacy scan (`scripts/privacy_scan.py`).
 The app opens to a glanceable **World Static** dashboard (no app tiles on home):
 
 - A dim, outline-treated crop of Thespia campaign art (the colony quarters with a cyan ore vein and a viewport to the chained hulls) sits behind the UI. It is darkened for the additive 600×600 display, where black reads as transparent, so the clock and cards stay readable. The source is official Thespia concept art already made for the game — no people, no workplace photos, and no personal information
-- A large clock and the date, with a compact **Daily funds** badge beside them (left today, spent, and a tiny bar). Open the badge to set the budget. Spent resets at local midnight; a short history stays on the device. Nothing is sent anywhere
+- A large clock and the date, with a compact **Daily funds** badge beside them (remaining today, spent, and a tiny bar). Open the badge for today's transactions, to add spend, or to set the daily amount. Remaining is daily amount minus spent. Spent resets at local midnight, or you can reset today yourself. Nothing is sent anywhere
 - **Next up**, directly under the date: one schedule line you set (the next stream or shift), stored in `localStorage`
-- The current **Task** card from your Task Cards data (soonest due day first), with up to three uncompleted checklist bullets and “+N more” if needed. Open it to jump to that task
+- The current **Task** card from your Task Cards data (soonest due day first), with up to three uncompleted checklist bullets and “+N more” if needed. Open it to that card's detail
 - A short line with the last message from Major or C 2
 - One primary **Apps** button
 
-App tiles live on a separate **Apps** screen. **Add spend** is a two-step form so the glasses composer cannot write into the wrong box: first Amount, then Next, then an optional Label, then Save. Each step shows only one `type=search` field. Spent entries still add to today's running total. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
+App tiles live on a separate **Apps** screen. **Daily funds** opens a hub: add spend (Amount, then an optional Label — one `type=search` field per step), a scrollable **Transactions** list (newest first, pinch a row to delete it), **Set daily amount**, **Reset today** (clears spent and transactions after a confirm), and **Reset daily amount** (confirm, transactions stay). Remaining on the Home badge is daily amount minus spent. **Task Cards**, **Teleprompter**, **Timer** (stopwatch or countdown), **Notes** (dictated scratch pad), **Focus** (25 minutes on, 5 off), **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
 
 ## Task Cards
 
 General-purpose lists, defaulting to **Work**, **Home**, and **Projects**. You can create and rename lists. Each task has a title (dictate in a `search` field), an optional note, done/undone, and an optional due day (`today`, `Friday`, or `Nov 25`).
 
-Arrow keys move spatially through each card, **Prev list** / **Next list**, then **New task**, **Actions**, **Lists**, and **Home**, which sit in the same document flow so a downward swipe can reach the bottom bar. Long lists scroll with the page. Enter marks the selected task done or opens it from the list. **New task** and **Edit task** also use one field at a time (Title, then Note, then Due). **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
+Arrow keys move in a fixed order: each card from top to bottom, then the 2×2 footer (**New task**, **Actions**, **Lists**, **Home**). Long lists scroll the focused card into view. Enter opens the card. On the detail screen you can check individual bullets, mark the whole card done, or edit; focus stays on the bullet you just checked, and Back returns to the same card. **New task** and **Edit** still use one field at a time (Title, then Note, then Due). **Actions** can edit, move, reorder, or delete a task. **Lists** switches lists, and can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
 
 The shipped seed tasks are generic examples only. Do not put work CSVs or customer data into a backup you share.
 
@@ -55,7 +55,7 @@ The shipped seed tasks are generic examples only. Do not put work CSVs or custom
 
 For talking points while you stream game dev. Create, edit, or delete scripts (title plus body). Dictate a line into the search field, or paste the full script. **Export / Import** accepts a JSON backup or a plain-text / `.txt` script.
 
-**Play** shows large high-contrast text scrolling on a black background. Enter pauses or resumes, Up/Down change speed, and Left/Right jump to the previous or next paragraph or segment. Lines that start with `## ` become segments. A time like `## Intro 2m` sets a per-segment target, shown next to the elapsed timer. You can change the text size on the script screen.
+On the script screen, choose **Scroll** or **Slides**. The choice is stored in `localStorage`. **Scroll** is the original behavior: large high-contrast text moving on a black background, Enter pauses or resumes, Up/Down change speed, and Left/Right jump segments. **Slides** splits the script by blank lines or paragraphs (long paragraphs are auto-split to fit the 600×600 readout) and shows one card at a time with an `n / total` counter. Right/Down or Enter goes to the next slide, Left/Up goes to the previous one, and the first and last cards stay put. From the last slide, Down reaches **Back**. Lines that start with `## ` become segments (and slide boundaries). A time like `## Intro 2m` sets a per-segment target in Scroll mode. You can change the text size on the script screen.
 
 One generic **Stream intro** script is included as an example.
 
@@ -94,7 +94,7 @@ The app must be on a public HTTPS URL (GitHub Pages once enabled). In the Meta A
 
 ## Privacy
 
-This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, Talk settings and threads, daily funds, and Next up stay in `localStorage` on the device. A live relay URL or token, if you add one, is entered on the glasses and is never part of this source.
+This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, Talk settings and threads, daily funds, notes, timers, and Next up stay in `localStorage` on the device. A live relay URL or token, if you add one, is entered on the glasses and is never part of this source.
 
 ## What this app assumes from Meta's docs
 
@@ -105,7 +105,7 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 - Web Apps cannot use the microphone. Voice input uses the on-glasses composer (activate the search field to dictate). That needs firmware v127+ and Meta AI app v272+.
 - Text to speech uses `window.speechSynthesis`. App data uses `localStorage`. A service worker can cache the app shell after a first online visit.
 - The glasses app icon comes from `.well-known/meta-wearables-manifest.json`. This repo includes a `.nojekyll` file so Pages serves that folder. The app name and short name are **World Static**.
-- Home, Apps, and Settings show a small **v15** label so you can confirm the cache you have. If the glasses still show an older version, leave the app completely and open it again (on a network) so the service worker can update; v15 uses `skipWaiting`, `clients.claim`, network-first HTML/JS, and a one-time reload on `controllerchange`.
+- Home, Apps, and Settings show a small **v16** label so you can confirm the cache you have. If the glasses still show an older version, leave the app completely and open it again (on a network) so the service worker can update; v16 uses `skipWaiting`, `clients.claim`, network-first HTML/JS, and a one-time reload on `controllerchange`.
 - **Settings** (from the Apps screen) has a **Color scheme** (Cyan, Amber, Green, Magenta, White) and a **Font** (HUD, Sans, Mono, System). The canvas stays black; each scheme tints all text (body type, labels, task bullets, chat bubbles, the version label) plus accents and outlines. Time and date use a slightly brighter shade of the same tint; White stays white. Changes apply instantly and are stored in `localStorage` on the device, applied before first paint. The default typeface is Rajdhani (HUD). Font files are self-hosted under `fonts/` with their SIL Open Font License texts; the app never loads fonts from a CDN. Apps and Settings also include an **Input debug** toggle (off by default). It shows the last five input events (`type`, `key`, `code`, `keyCode`, `deltaY`) so a Neural Band swipe can be reported if a gesture is not arriving as an arrow key.
 - Sources for Neural Band / spatial navigation: [Input and navigation](https://wearables.developer.meta.com/docs/develop/webapps/build/input-and-navigation/) (updated 27 Sep 2026), [Build web apps](https://wearables.developer.meta.com/docs/develop/webapps/build/), [Test](https://wearables.developer.meta.com/docs/develop/webapps/test/) (`--enable-spatial-navigation`), and [How to use Meta Neural Band](https://www.meta.com/help/ai-glasses/764536076119235/).
 
@@ -114,7 +114,9 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 - `index.html`, `styles.css`, `app.js`, `funds.js`, `focus-nav.js`, `theme.js` — World Static dashboard, Apps, Settings, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, daily funds, color/font preferences, and glasses focus helpers
 - `fonts/` — self-hosted OFL typefaces (Rajdhani, Inter, JetBrains Mono)
 - `tasks.js` — Task Cards storage, due-day parsing, and export/import
-- `prompter.js` — Teleprompter storage, segment parsing, and export/import
+- `prompter.js` — Teleprompter storage, segment parsing, slide splitting, and export/import
+- `notes.js` — dictated quick notes stored on the device
+- `timer.js` — stopwatch, countdown, and Focus session helpers
 - `major-transport.js` — pluggable message transport (mock preview, optional on-device HTTPS bridge)
 - `scale.js` — length parsing, unit conversion, and measurement storage helpers
 - `library.json` — 15 UE 5.6 Blueprint recipes

@@ -1494,3 +1494,92 @@ button.talk-retry .talk-ts {
 .screen.settings-screen {
   background-color: transparent;
 }
+
+
+.timer-readout {
+  margin: 0.4rem 0 0;
+  font-size: 3.1rem;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--text-strong);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--text-strong) 28%, transparent);
+}
+
+.tx-row .tile-title {
+  font-variant-numeric: tabular-nums;
+}
+
+.task-check.is-done .tile-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.prompter-slide-stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  min-block-size: 12rem;
+  padding: 0.6rem 0.2rem;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  appearance: none;
+}
+
+.prompter-slide-stage:focus,
+.prompter-slide-stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.prompter-slide-text {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 550;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.screen.prompter-slides .prompter-stage {
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+
+#prompter-slide-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.kind-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.kind-toggle-row > button {
+  flex: 1 1 6rem;
+}
+
+button.secondary.selected {
+  border-color: var(--accent);
+  color: var(--text-strong);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.tile.is-selected {
+  border-color: var(--accent);
+}
+
+.screen.funds-home-screen,
+.screen.funds-tx-screen,
+.screen.timer-screen,
+.screen.timer-run-screen,
+.screen.focus-screen,
+.screen.notes-screen,
+.screen.settings-screen {
+  background-color: transparent;
+}

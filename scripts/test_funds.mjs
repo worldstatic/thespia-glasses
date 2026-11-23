@@ -88,3 +88,44 @@ test("parseAmount accepts $ and commas", () => {
   assert.equal(funds.parseAmount("1,000"), 1000);
   assert.equal(funds.parseAmount(-2), null);
 });
+
+test("transactions are newest first and deleteEntry recalculates spent", () => {
+  const now = day(2026, 11, 23, 9);
+  let data = funds.setBudget(funds.blank(now), 40, now).data;
+  data = funds.addSpend(data, 5, "coffee", day(2026, 11, 23, 9)).data;
+  data = funds.addSpend(data, 8, "lunch", day(2026, 11, 23, 12)).data;
+  data = funds.addSpend(data, 2, "snack", day(2026, 11, 23, 15)).data;
+  const rows = funds.transactions(data);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].label, "snack");
+  assert.equal(rows[2].label, "coffee");
+  assert.equal(data.spent, 15);
+  const removed = funds.deleteEntry(data, rows[1].id, now);
+  assert.equal(removed.ok, true);
+  assert.equal(removed.data.spent, 7);
+  assert.equal(removed.data.entries.length, 2);
+  assert.equal(funds.remaining(removed.data), 33);
+  const missing = funds.deleteEntry(removed.data, "nope", now);
+  assert.equal(missing.ok, false);
+});
+
+test("reset today clears spend and transactions but keeps the daily amount", () => {
+  const now = day(2026, 11, 23, 16);
+  let data = funds.setBudget(funds.blank(now), 40, now).data;
+  data = funds.addSpend(data, 11, "parts", now).data;
+  const reset = funds.resetDay(data, now);
+  assert.equal(reset.data.spent, 0);
+  assert.equal(reset.data.entries.length, 0);
+  assert.equal(reset.data.budget, 40);
+  assert.equal(funds.remaining(reset.data), 40);
+});
+
+test("reset daily amount clears the budget and leaves transactions", () => {
+  const now = day(2026, 11, 23, 16);
+  let data = funds.setBudget(funds.blank(now), 40, now).data;
+  data = funds.addSpend(data, 6, "tape", now).data;
+  const reset = funds.resetBudget(data, now);
+  assert.equal(reset.data.budget, 0);
+  assert.equal(reset.data.spent, 6);
+  assert.equal(reset.data.entries.length, 1);
+});

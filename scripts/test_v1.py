@@ -183,8 +183,10 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
     tiles_fn = extract_js_function(js, "appTiles")
     if "tile-grid" not in apps_fn or "appTiles()" not in apps_fn:
         failures.append("Apps screen must list the app tiles")
-    if "open-add-spend" not in tiles_fn and 'buttonId: "open-add-spend"' not in js:
-        failures.append("Add spend must be a tile on the Apps screen")
+    if "open-daily-funds" not in js and 'buttonId: "open-daily-funds"' not in js:
+        failures.append("Daily funds must be a tile on the Apps screen")
+    if "open-add-spend" not in js:
+        failures.append("Daily funds hub must include Add spend")
     if "open-task-cards" not in tiles_fn and "open-task-cards" not in js:
         failures.append("Apps tiles must still include Task Cards")
     if "go-home" not in apps_fn and "homeButton()" not in apps_fn:
@@ -204,10 +206,18 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
     focus_nav = (ROOT / "focus-nav.js").read_text(encoding="utf-8")
     if "speechSynthesis" not in js or ("ArrowLeft" not in js and "ArrowLeft" not in focus_nav):
         failures.append("input or TTS hooks missing")
-    if "app-version" not in js or "v15" not in js:
-        failures.append("Home/Apps must show a v15 version label")
+    if "app-version" not in js or "v16" not in js:
+        failures.append("Home/Apps must show a v16 version label")
     if "theme.js" not in html:
         failures.append("index.html must load theme.js")
+    if "notes.js" not in html or "timer.js" not in html:
+        failures.append("index.html must load notes.js and timer.js")
+    if "open-transactions" not in js or "funds-tx-" not in js:
+        failures.append("Daily funds must include a Transactions list")
+    if "prompter-mode-slides" not in js or "splitSlides" not in (ROOT / "prompter.js").read_text(encoding="utf-8"):
+        failures.append("Teleprompter must offer a saved Slides mode")
+    if "open-timer" not in js or "open-notes" not in js or "open-focus" not in js:
+        failures.append("Apps must include Timer, Notes, and Focus")
     if 'data-theme="cyan"' not in html or "thespia.hud.theme" not in html:
         failures.append("index.html must apply the saved color scheme before paint")
     if "funds-next" not in js or "goFundsStep" not in js:
@@ -491,8 +501,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v15" not in sw and "${CACHE_PREFIX}v15" not in sw:
-        failures.append("service worker cache version should be v15")
+    if "thespia-blueprint-help-v16" not in sw and "${CACHE_PREFIX}v16" not in sw:
+        failures.append("service worker cache version should be v16")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
@@ -501,8 +511,10 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("service worker must precache focus-nav.js")
     if "theme.js" not in sw or "Rajdhani-Regular.woff2" not in sw:
         failures.append("service worker must precache theme.js and HUD font files")
+    if "notes.js" not in sw or "timer.js" not in sw:
+        failures.append("service worker must precache notes.js and timer.js")
     if "skipWaiting" not in sw or "clients.claim" not in sw:
-        failures.append("service worker must skipWaiting and clients.claim so v15 can replace a stuck cache")
+        failures.append("service worker must skipWaiting and clients.claim so v16 can replace a stuck cache")
     if "isNetworkFirst" not in sw:
         failures.append("service worker must fetch HTML/JS network-first")
 
@@ -1007,6 +1019,18 @@ def main() -> int:
         out = (funds_test.stdout or "") + (funds_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"funds: {line}")
+
+    tools_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_tools.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if tools_test.returncode != 0:
+        failures.append("timer, notes, and slides tests failed")
+        out = (tools_test.stdout or "") + (tools_test.stderr or "")
+        for line in out.strip().splitlines()[-16:]:
+            failures.append(f"tools: {line}")
 
     theme_test = subprocess.run(
         ["node", "--test", str(ROOT / "scripts/test_theme.mjs")],
