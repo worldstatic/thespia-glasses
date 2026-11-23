@@ -6,9 +6,10 @@
 html[data-theme="cyan"] {
   --bg: #000;
   --bg-inset: #050505;
-  --text: #f5f5f5;
-  --muted: #bdbdbd;
-  --muted-dim: #8d8d8d;
+  --text: #d8f4ff;
+  --text-strong: #f2fbff;
+  --muted: #9ecbda;
+  --muted-dim: #6f9eac;
   --accent: #7ee0ff;
   --accent-dim: #5fa8bd;
   --line: color-mix(in srgb, var(--accent) 34%, #1a1a1a);
@@ -24,6 +25,10 @@ html[data-theme="cyan"] {
 html[data-theme="amber"] {
   --accent: #ffb86b;
   --accent-dim: #d4924a;
+  --text: #ffe4bf;
+  --text-strong: #fff3e0;
+  --muted: #d4b48a;
+  --muted-dim: #a8885e;
   --warm: #ffd19a;
   --art-tint: rgba(255, 184, 107, 0.22);
 }
@@ -31,6 +36,10 @@ html[data-theme="amber"] {
 html[data-theme="green"] {
   --accent: #8cff9a;
   --accent-dim: #5fbf72;
+  --text: #d4ffd8;
+  --text-strong: #edffee;
+  --muted: #9ed4a4;
+  --muted-dim: #6fa376;
   --ok: #b8ffc2;
   --art-tint: rgba(140, 255, 154, 0.2);
 }
@@ -38,12 +47,20 @@ html[data-theme="green"] {
 html[data-theme="magenta"] {
   --accent: #ff7ad9;
   --accent-dim: #c75eab;
+  --text: #ffd4f2;
+  --text-strong: #ffeaf8;
+  --muted: #d49cc6;
+  --muted-dim: #a86e99;
   --art-tint: rgba(255, 122, 217, 0.2);
 }
 
 html[data-theme="white"] {
   --accent: #f5f5f5;
   --accent-dim: #c8c8c8;
+  --text: #f5f5f5;
+  --text-strong: #ffffff;
+  --muted: #bdbdbd;
+  --muted-dim: #8d8d8d;
   --warm: #e8e8e8;
   --art-tint: rgba(255, 255, 255, 0.12);
 }
@@ -345,7 +362,7 @@ button.primary {
   background: transparent;
   border-color: var(--accent);
   color: var(--text);
-  box-shadow: 0 0 8px rgba(126, 224, 255, 0.18);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 button.secondary {
@@ -540,7 +557,7 @@ button.funds-badge {
   min-block-size: 0;
   padding: 0.35rem 0.5rem 0.4rem;
   background: #000;
-  border: 1px solid rgba(126, 224, 255, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 0.65rem;
   text-align: left;
 }
@@ -548,7 +565,7 @@ button.funds-badge {
 button.funds-badge:focus,
 button.funds-badge:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(126, 224, 255, 0.32);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 button.funds-badge .tile-icon {
@@ -622,7 +639,7 @@ button.funds-badge.over .funds-bar-fill {
   height: 1.75rem;
   flex: none;
   display: block;
-  filter: drop-shadow(0 0 6px rgba(126, 224, 255, 0.4));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
 .boot-screen {
@@ -646,7 +663,7 @@ button.funds-badge.over .funds-bar-fill {
   width: 5.5rem;
   height: 5.5rem;
   flex: none;
-  filter: drop-shadow(0 0 12px rgba(126, 224, 255, 0.4));
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
 .wordmark {
@@ -657,7 +674,7 @@ button.funds-badge.over .funds-bar-fill {
   letter-spacing: 0.2em;
   line-height: 1.2;
   text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(126, 224, 255, 0.28);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
   position: relative;
   display: inline-block;
 }
@@ -702,14 +719,15 @@ button.funds-badge.over .funds-bar-fill {
   letter-spacing: -0.05em;
   line-height: 1;
   margin-top: 0.2rem;
-  color: var(--text);
-  text-shadow: 0 0 18px rgba(245, 245, 245, 0.12);
+  color: var(--text-strong);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--text-strong) 28%, transparent);
 }
 
 .hud-date {
   margin: 0.2rem 0 0;
-  color: var(--muted);
+  color: var(--text-strong);
   font-size: 0.95rem;
+  opacity: 0.86;
 }
 
 .next-up {
@@ -718,7 +736,7 @@ button.funds-badge.over .funds-bar-fill {
   text-align: left;
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgba(126, 224, 255, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 0.7rem;
   padding: 0.5rem 0.7rem;
   min-block-size: 2.8rem;
@@ -727,7 +745,7 @@ button.funds-badge.over .funds-bar-fill {
 .next-up:focus,
 .next-up:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 14px rgba(126, 224, 255, 0.35);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .next-up-label {
@@ -741,6 +759,7 @@ button.funds-badge.over .funds-bar-fill {
 .next-up-text {
   display: block;
   margin-top: 0.12rem;
+  color: var(--text);
   font-weight: 600;
   font-size: 1rem;
   line-height: 1.25;
@@ -760,7 +779,7 @@ button.dash-card {
   inline-size: 100%;
   text-align: left;
   background: #000;
-  border: 1px solid rgba(126, 224, 255, 0.38);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
   border-radius: 0.65rem;
   padding: 0.4rem 0.65rem 0.42rem;
   min-block-size: 0;
@@ -769,7 +788,7 @@ button.dash-card {
 button.dash-card:focus,
 button.dash-card:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(126, 224, 255, 0.32);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .dash-label {
@@ -783,6 +802,7 @@ button.dash-card:focus-visible {
 .dash-text {
   display: block;
   margin-top: 0.1rem;
+  color: var(--text);
   font-weight: 600;
   font-size: 1rem;
   line-height: 1.25;
@@ -842,13 +862,13 @@ button.funds-card.over .funds-bar-fill {
   gap: 0.12rem;
   padding: 0.45rem 0.5rem 0.4rem;
   min-block-size: 3.35rem;
-  border-color: rgba(126, 224, 255, 0.32);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .tile-grid button.tile:focus,
 .tile-grid button.tile:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 16px rgba(126, 224, 255, 0.45);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
   transform: scale(1.04);
   z-index: 1;
 }
@@ -1001,7 +1021,7 @@ p.scale-lines {
 
 .task-item.is-selected {
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(126, 224, 255, 0.3);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .task-item.is-done .tile-title {
@@ -1096,7 +1116,7 @@ p.scale-lines {
   color: var(--text);
   font-weight: 550;
   line-height: 1.35;
-  text-shadow: 0 0 10px rgba(245, 245, 245, 0.12);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--text-strong) 28%, transparent);
 }
 
 .prompter-status {
@@ -1213,7 +1233,7 @@ button.kind-toggle {
 button.kind-toggle.selected {
   background: #000;
   border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(126, 224, 255, 0.35);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 button.kind-toggle:focus,
@@ -1318,6 +1338,7 @@ button.talk-typing-row {
 
 .talk-bubble-text {
   margin: 0;
+  color: var(--text);
   font-size: 1.02rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -1325,7 +1346,7 @@ button.talk-typing-row {
 
 .talk-ts {
   margin: 0.18rem 0.2rem 0;
-  color: var(--muted-dim);
+  color: var(--muted);
   font-size: 0.72rem;
 }
 

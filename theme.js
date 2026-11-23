@@ -11,11 +11,11 @@
   const DEFAULT_FONT = "rajdhani";
 
   const THEMES = [
-    { id: "cyan", title: "Cyan", accent: "#7ee0ff" },
-    { id: "amber", title: "Amber", accent: "#ffb86b" },
-    { id: "green", title: "Green", accent: "#8cff9a" },
-    { id: "magenta", title: "Magenta", accent: "#ff7ad9" },
-    { id: "white", title: "White", accent: "#f5f5f5" },
+    { id: "cyan", title: "Cyan", accent: "#7ee0ff", text: "#d8f4ff", textStrong: "#f2fbff", muted: "#9ecbda", mutedDim: "#6f9eac" },
+    { id: "amber", title: "Amber", accent: "#ffb86b", text: "#ffe4bf", textStrong: "#fff3e0", muted: "#d4b48a", mutedDim: "#a8885e" },
+    { id: "green", title: "Green", accent: "#8cff9a", text: "#d4ffd8", textStrong: "#edffee", muted: "#9ed4a4", mutedDim: "#6fa376" },
+    { id: "magenta", title: "Magenta", accent: "#ff7ad9", text: "#ffd4f2", textStrong: "#ffeaf8", muted: "#d49cc6", mutedDim: "#a86e99" },
+    { id: "white", title: "White", accent: "#f5f5f5", text: "#f5f5f5", textStrong: "#ffffff", muted: "#bdbdbd", mutedDim: "#8d8d8d" },
   ];
 
   const FONTS = [

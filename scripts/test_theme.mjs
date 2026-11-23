@@ -36,3 +36,28 @@ test("saveTheme and saveFont persist allowed ids and reject unknown ones", () =>
   assert.equal(theme.loadTheme(), "cyan");
   assert.equal(theme.loadFont(), "rajdhani");
 });
+
+test("each scheme has a tinted text color; White stays white; time uses a brighter shade", () => {
+  assert.ok(theme.THEMES.every((item) => item.text && item.textStrong && item.muted));
+  const white = theme.THEMES.find((item) => item.id === "white");
+  assert.equal(white.text.toLowerCase(), "#f5f5f5");
+  assert.equal(white.textStrong.toLowerCase(), "#ffffff");
+  for (const item of theme.THEMES) {
+    if (item.id === "white") continue;
+    assert.notEqual(item.text.toLowerCase(), "#f5f5f5");
+    assert.notEqual(item.text.toLowerCase(), "#ffffff");
+    assert.notEqual(item.textStrong.toLowerCase(), item.text.toLowerCase());
+  }
+});
+
+test("styles.css applies per-scheme text tokens to body, clock, and date", () => {
+  const fs = require("node:fs");
+  const css = fs.readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "styles.css"), "utf8");
+  assert.match(css, /\.hud-clock[^{]*\{[^}]*color:\s*var\(--text-strong\)/s);
+  assert.match(css, /\.hud-date[^{]*\{[^}]*color:\s*var\(--text-strong\)/s);
+  assert.match(css, /body\s*\{[^}]*color:\s*var\(--text\)/s);
+  for (const item of theme.THEMES) {
+    assert.ok(css.includes(item.text), "styles.css missing text token " + item.text + " for " + item.id);
+    assert.ok(css.includes(item.textStrong), "styles.css missing textStrong token " + item.textStrong + " for " + item.id);
+  }
+});
