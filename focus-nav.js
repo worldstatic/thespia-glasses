@@ -12,7 +12,7 @@
   "use strict";
 
   const TASK_FOOTER_IDS = ["open-new-task", "open-task-actions", "open-task-lists", "go-home"];
-  const APP_VERSION = "v16";
+  const APP_VERSION = "v17";
 
   function isDisabled(el) {
     return Boolean(el && (el.disabled || el.getAttribute("aria-disabled") === "true"));
@@ -309,25 +309,18 @@
   }
 
   function taskScreenNext(currentId, spatial, taskCount) {
-    const cards = [];
-    const n = Math.max(0, Number(taskCount) || 0);
-    for (let i = 0; i < n; i += 1) cards.push("task-item-" + i);
+    /* Down/Right visit every card, then New task, Actions, Lists, Home.
+       A 2x2 spatial footer skipped Actions and Home when the user only swiped down. */
+    const ids = taskCardIds(taskCount);
+    if (!ids.length) return "";
     const dir = spatial === "up" || spatial === "left" ? -1 : 1;
-    const cardIndex = cards.indexOf(currentId);
-    if (cardIndex >= 0) {
-      const next = cardIndex + dir;
-      if (next >= 0 && next < cards.length) return cards[next];
-      if (dir > 0) return TASK_FOOTER_IDS[0];
-      return TASK_FOOTER_IDS[TASK_FOOTER_IDS.length - 1];
-    }
-    const inFooter = TASK_FOOTER_IDS.indexOf(currentId) >= 0;
-    if (inFooter) {
-      const gridNext = footerGridNext(currentId, spatial || (dir > 0 ? "down" : "up"));
-      if (gridNext) return gridNext;
-      if (dir < 0 || spatial === "up") return cards.length ? cards[cards.length - 1] : TASK_FOOTER_IDS[0];
-      return cards.length ? cards[0] : TASK_FOOTER_IDS[0];
-    }
-    return cards[0] || TASK_FOOTER_IDS[0];
+    if (ids.indexOf(currentId) < 0) return dir > 0 ? ids[0] : ids[ids.length - 1];
+    return stepIds(ids, currentId, dir, true);
+  }
+
+  function isTaskFamily(screenName) {
+    const name = String(screenName || "");
+    return name === "tasks" || name.indexOf("tasks-") === 0;
   }
 
   function taskDetailIds(checkCount) {
@@ -390,6 +383,7 @@
     taskScreenNext: taskScreenNext,
     taskDetailIds: taskDetailIds,
     footerGridNext: footerGridNext,
+    isTaskFamily: isTaskFamily,
     talkDefaultFocus: talkDefaultFocus,
   };
 

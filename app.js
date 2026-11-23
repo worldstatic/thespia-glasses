@@ -518,7 +518,7 @@
 
   function appVersionLabel() {
     const nav = window.WorldStaticFocusNav;
-    const ver = (nav && nav.APP_VERSION) || "v16";
+    const ver = (nav && nav.APP_VERSION) || "v17";
     return el("p", { className: "app-version", id: "app-version", text: ver });
   }
 
@@ -1327,7 +1327,7 @@
     const target = document.getElementById("major-message") || document.getElementById("talk-thread-end");
     if (target && typeof target.scrollIntoView === "function") {
       try {
-        target.scrollIntoView({ block: "nearest", inline: "nearest" });
+        target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
       } catch (_err) {
         target.scrollIntoView(false);
       }
@@ -3823,6 +3823,7 @@
                 {
                   type: "button",
                   className: "tile",
+                  id: "task-move-" + list.id,
                   onClick: () => {
                     api.moveTask(sel.data, task.id, list.id);
                     persistTasks(sel.data);
@@ -5538,7 +5539,7 @@
       if (node && typeof node.focus === "function" && lost) node.focus();
       if (node && typeof node.scrollIntoView === "function") {
         try {
-          node.scrollIntoView({ block: "nearest", inline: "nearest" });
+          node.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
         } catch (_err) {
           node.scrollIntoView(false);
         }
@@ -5673,7 +5674,7 @@
     node.focus();
     if (typeof node.scrollIntoView === "function") {
       try {
-        node.scrollIntoView({ block: "nearest", inline: "nearest" });
+        node.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
       } catch (_err) {
         node.scrollIntoView(false);
       }
@@ -5696,12 +5697,26 @@
     return focusNode(next);
   }
 
+  function isTaskFamilyScreen(state) {
+    const nav = focusNavApi();
+    const name = state && state.screen;
+    if (nav && typeof nav.isTaskFamily === "function") return nav.isTaskFamily(name);
+    return Boolean(name && (name === "tasks" || String(name).indexOf("tasks-") === 0));
+  }
+
+  function cancelNativeNav(event) {
+    if (!event) return;
+    if (typeof event.preventDefault === "function") event.preventDefault();
+    if (typeof event.stopPropagation === "function") event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+  }
+
   function ownsCustomArrows(state, event, nav) {
     const screenName = state && state.screen;
     const id = event && event.target && event.target.id;
     const name = nav && nav.name;
     if (screenName === "prompter-play" && !isTypingTarget(event.target) && id !== "go-back") return true;
-    if ((screenName === "tasks" || screenName === "tasks-detail") && !isTypingTarget(event.target)) return true;
+    if (isTaskFamilyScreen(state) && !isTypingTarget(event.target)) return true;
     if (screenName === "scale-convert" && id === "scale-value-panel") return true;
     if (screenName === "recipe" && id === "step-panel" && (name === "left" || name === "right")) return true;
     if (screenName === "scale-category" && id === "scale-entry-panel" && (name === "left" || name === "right")) return true;
@@ -5711,36 +5726,45 @@
   function moveTaskScreenFocus(state, nav, current) {
     const api = focusNavApi();
     const spatial = (nav && nav.spatial) || (nav && nav.dir > 0 ? "down" : "up");
-    if (state && state.screen === "tasks-detail") {
-      const checks = app.querySelectorAll(".task-check");
-      const ids = api && api.taskDetailIds ? api.taskDetailIds(checks.length) : [];
-      const currentId = current && current.id ? current.id : (ids[0] || "");
-      const nextId = api && api.stepIds ? api.stepIds(ids, currentId, nav.dir, true) : "";
+    const dir = nav && nav.dir ? nav.dir : spatial === "up" || spatial === "left" ? -1 : 1;
+    if (state && state.screen === "tasks") {
+      const cards = app.querySelectorAll(".screen .task-item");
+      const currentId = current && current.id ? current.id : "task-item-0";
+      const nextId = api && api.taskScreenNext ? api.taskScreenNext(currentId, spatial, cards.length) : "";
       return focusNode(document.getElementById(nextId));
     }
-    const cards = app.querySelectorAll(".screen .task-item");
-    const currentId = current && current.id ? current.id : "task-item-0";
-    const nextId = api && api.taskScreenNext ? api.taskScreenNext(currentId, spatial, cards.length) : "";
-    return focusNode(document.getElementById(nextId));
+    /* Detail, Actions, Lists, New task, and the other task screens: one linear
+       DOM order so every visible control is reachable and none are skipped. */
+    const items = screenFocusables();
+    if (!items.length) return false;
+    const next = api && typeof api.step === "function" ? api.step(items, current || document.activeElement, dir, true) : null;
+    return focusNode(next);
   }
+
+  let lastArrowKeyAt = 0;
 
   function handleDirectionalMove(event, nav) {
     if (!nav || !nav.dir) return false;
+    const typ = event && event.type ? event.type : "";
+    if ((typ === "wheel" || typ === "mousewheel") && lastArrowKeyAt && Date.now() - lastArrowKeyAt < 200) {
+      cancelNativeNav(event);
+      return true;
+    }
     const state = currentState();
-    if (state && (state.screen === "tasks" || state.screen === "tasks-detail") && !isTypingTarget(event.target)) {
-      event.preventDefault();
-      if (typeof event.stopPropagation === "function") event.stopPropagation();
+    if (isTaskFamilyScreen(state)) {
+      cancelNativeNav(event);
+      if (typ === "keydown" || typ === "keypress") lastArrowKeyAt = Date.now();
       moveTaskScreenFocus(state, nav, event.target);
       return true;
     }
     if (ownsCustomArrows(state, event, nav)) return false;
     /* Wheel on a button should still scroll the page. Arrows are intercepted
        so type=search fields stay in the same focus order as buttons. */
-    if ((event.type === "wheel" || event.type === "mousewheel") && !isTypingTarget(event.target) && !nav.fromTab) {
+    if ((typ === "wheel" || typ === "mousewheel") && !isTypingTarget(event.target) && !nav.fromTab) {
       return false;
     }
-    event.preventDefault();
-    if (typeof event.stopPropagation === "function") event.stopPropagation();
+    cancelNativeNav(event);
+    if (typ === "keydown" || typ === "keypress") lastArrowKeyAt = Date.now();
     const spatial = nav.spatial || (nav.dir > 0 ? "down" : "up");
     moveLinearFocus(nav.dir, event.target, spatial);
     return true;

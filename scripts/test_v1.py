@@ -206,8 +206,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
     focus_nav = (ROOT / "focus-nav.js").read_text(encoding="utf-8")
     if "speechSynthesis" not in js or ("ArrowLeft" not in js and "ArrowLeft" not in focus_nav):
         failures.append("input or TTS hooks missing")
-    if "app-version" not in js or "v16" not in js:
-        failures.append("Home/Apps must show a v16 version label")
+    if "app-version" not in js or "v17" not in js:
+        failures.append("Home/Apps must show a v17 version label")
     if "theme.js" not in html:
         failures.append("index.html must load theme.js")
     if "notes.js" not in html or "timer.js" not in html:
@@ -501,8 +501,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v16" not in sw and "${CACHE_PREFIX}v16" not in sw:
-        failures.append("service worker cache version should be v16")
+    if "thespia-blueprint-help-v17" not in sw and "${CACHE_PREFIX}v17" not in sw:
+        failures.append("service worker cache version should be v17")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
@@ -514,7 +514,7 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
     if "notes.js" not in sw or "timer.js" not in sw:
         failures.append("service worker must precache notes.js and timer.js")
     if "skipWaiting" not in sw or "clients.claim" not in sw:
-        failures.append("service worker must skipWaiting and clients.claim so v16 can replace a stuck cache")
+        failures.append("service worker must skipWaiting and clients.claim so v17 can replace a stuck cache")
     if "isNetworkFirst" not in sw:
         failures.append("service worker must fetch HTML/JS network-first")
 

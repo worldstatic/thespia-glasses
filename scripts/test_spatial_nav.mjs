@@ -112,6 +112,88 @@ function missing(seen, required) {
   return required.filter((id) => !seen.includes(id));
 }
 
+async function focusId(page, id) {
+  await page.evaluate((target) => {
+    const el = document.getElementById(target);
+    if (el && typeof el.focus === "function") el.focus();
+  }, id);
+}
+
+async function visibleFocusIds(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector(".screen") || document;
+    const nodes = root.querySelectorAll("button, input, textarea, select, a[href], [tabindex]");
+    const ids = [];
+    for (const el of nodes) {
+      if (!el.id) continue;
+      if (el.disabled || el.getAttribute("aria-disabled") === "true") continue;
+      if (el.getAttribute("tabindex") === "-1") continue;
+      if (el.hasAttribute("hidden") || el.getAttribute("aria-hidden") === "true") continue;
+      if (el.id === "input-debug" || (el.closest && el.closest("#input-debug"))) continue;
+      ids.push(el.id);
+    }
+    return ids;
+  });
+}
+
+async function assertLinearDown(page, failures, label) {
+  const expected = await visibleFocusIds(page);
+  if (!expected.length) {
+    failures.push(label + " has no focusable controls");
+    return;
+  }
+  await focusId(page, expected[0]);
+  const walk = [await currentId(page)];
+  for (let i = 0; i < expected.length; i += 1) {
+    const prev = walk[walk.length - 1];
+    await press(page, "ArrowDown");
+    const next = await currentId(page);
+    walk.push(next);
+    const pi = expected.indexOf(prev);
+    const want = expected[(pi + 1) % expected.length];
+    if (next !== want) {
+      failures.push(label + " Arrow Down jumped or skipped: " + prev + " -> " + next + " (expected " + want + "). Walk " + walk.join(" -> "));
+      return;
+    }
+  }
+  const missed = expected.filter((id) => !walk.includes(id));
+  if (missed.length) failures.push(label + " Arrow Down never reached " + missed.join(", ") + " (walk " + walk.join(" -> ") + ")");
+}
+
+async function seedWorkTasks(page, titles) {
+  await page.evaluate((titles) => {
+    const tasks = (titles || []).map((title, i) => ({
+      id: "t-" + i,
+      title,
+      note: "",
+      done: false,
+      items: i === 0
+        ? [
+            { id: "i-a", text: "First bullet", done: false },
+            { id: "i-b", text: "Second bullet", done: false },
+          ]
+        : [],
+    }));
+    localStorage.setItem("thespia.hud.tasks", JSON.stringify({
+      version: 1,
+      lists: [
+        { id: "work", name: "Work", tasks },
+        { id: "home", name: "Home", tasks: [] },
+        { id: "projects", name: "Projects", tasks: [] },
+      ],
+    }));
+  }, titles);
+}
+
+async function openTaskCards(page) {
+  await page.goto(page.url().split("?")[0] + "?no-sw=1", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("#open-apps");
+  await page.click("#open-apps");
+  await page.waitForSelector("#open-task-cards");
+  await page.click("#open-task-cards");
+  await page.waitForSelector("#open-new-task");
+}
+
 async function seedTalk(page) {
   await page.evaluate(() => {
     const threads = {
@@ -157,7 +239,7 @@ async function main() {
     await page.waitForSelector("#open-apps", { timeout: 15000 });
 
     const version = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (version !== "v16") failures.push("Home version label should read v16, got " + version);
+    if (version !== "v17") failures.push("Home version label should read v17, got " + version);
 
     const homeIds = await reachableByArrows(page);
     const homeMissing = missing(homeIds, ["open-funds", "open-next-up", "open-current-task", "open-talk-preview", "open-apps"]);
@@ -166,7 +248,7 @@ async function main() {
     await page.click("#open-apps");
     await page.waitForSelector("#open-task-cards");
     const appsVersion = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (appsVersion !== "v16") failures.push("Apps version label should read v16, got " + appsVersion);
+    if (appsVersion !== "v17") failures.push("Apps version label should read v17, got " + appsVersion);
 
     await page.click("#open-task-cards");
     await page.waitForSelector("#open-new-task");
@@ -206,7 +288,7 @@ async function main() {
       await press(page, "ArrowDown");
       walk.push(await currentId(page));
     }
-    const expectedWalk = ["task-item-0", "task-item-1", "task-item-2", "open-new-task", "open-task-lists"];
+    const expectedWalk = ["task-item-0", "task-item-1", "task-item-2", "open-new-task", "open-task-actions"];
     if (walk.join(",") !== expectedWalk.join(",")) {
       failures.push("Task Cards Arrow Down order was " + walk.join(" -> ") + " (expected " + expectedWalk.join(" -> ") + ")");
     }
@@ -229,6 +311,75 @@ async function main() {
     await page.waitForSelector("#task-item-0");
     const afterBack = await currentId(page);
     if (afterBack !== "task-item-0") failures.push("Back from a card should restore focus to that card, got " + afterBack);
+
+    await assertLinearDown(page, failures, "Task Cards (3 cards)");
+    await focusId(page, "task-item-0");
+    await press(page, "ArrowDown");
+    const afterOne = await currentId(page);
+    if (afterOne !== "task-item-1") failures.push("A single Arrow Down from the first card should land on the second, got " + afterOne);
+    await page.evaluate(() => {
+      document.dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true }));
+    });
+    const afterWheel = await currentId(page);
+    if (afterWheel !== afterOne) {
+      failures.push("Wheel after an arrow also moved focus (jitter): " + afterOne + " -> " + afterWheel);
+    }
+
+    await focusId(page, "task-item-0");
+    await press(page, "Enter");
+    await page.waitForSelector("#task-check-0");
+    await assertLinearDown(page, failures, "Task detail");
+
+    await page.click("#go-back");
+    await page.waitForSelector("#open-task-actions");
+    await page.click("#open-task-actions");
+    await page.waitForSelector("#toggle-task-done");
+    await assertLinearDown(page, failures, "Task Actions");
+    const actionIds = await visibleFocusIds(page);
+    const actionMissing = missing(actionIds, ["toggle-task-done", "edit-task", "move-task-up", "move-task-down", "move-task-list", "delete-task", "go-back", "go-home"]);
+    if (actionMissing.length) failures.push("Actions screen is missing " + actionMissing.join(", "));
+
+    await page.click("#go-back");
+    await page.waitForSelector("#open-task-lists");
+    await page.click("#open-task-lists");
+    await page.waitForSelector("#rename-task-list");
+    await assertLinearDown(page, failures, "Task Lists");
+    const listIds = await visibleFocusIds(page);
+    const listMissing = missing(listIds, ["task-list-pick-0", "rename-task-list", "new-task-list", "go-back", "go-home"]);
+    if (listMissing.length) failures.push("Lists screen is missing " + listMissing.join(", "));
+
+    await page.click("#go-back");
+    await page.waitForSelector("#open-new-task");
+    await page.click("#open-new-task");
+    await page.waitForSelector("#task-title");
+    await assertLinearDown(page, failures, "New task");
+    const newIds = await visibleFocusIds(page);
+    const newMissing = missing(newIds, ["task-title", "task-step-next", "go-back", "go-home"]);
+    if (newMissing.length) failures.push("New task is missing " + newMissing.join(", "));
+    await page.click("#go-back");
+    await page.waitForSelector("#open-new-task");
+
+    await seedWorkTasks(page, []);
+    await openTaskCards(page);
+    await assertLinearDown(page, failures, "Task Cards (0 cards)");
+    const emptyIds = await visibleFocusIds(page);
+    if (emptyIds.some((id) => id.startsWith("task-item-"))) failures.push("Empty list should not show task cards, got " + emptyIds.join(", "));
+    const emptyMissing = missing(emptyIds, ["open-new-task", "open-task-actions", "open-task-lists", "go-home"]);
+    if (emptyMissing.length) failures.push("Empty Task Cards missed " + emptyMissing.join(", "));
+
+    await seedWorkTasks(page, ["Only card"]);
+    await openTaskCards(page);
+    await page.waitForSelector("#task-item-0");
+    await assertLinearDown(page, failures, "Task Cards (1 card)");
+
+    await seedWorkTasks(page, ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"]);
+    await openTaskCards(page);
+    await page.waitForSelector("#task-item-7");
+    await assertLinearDown(page, failures, "Task Cards (8 cards)");
+    await focusId(page, "task-item-7");
+    await press(page, "ArrowDown");
+    const fromLast = await currentId(page);
+    if (fromLast !== "open-new-task") failures.push("Arrow Down from the last of 8 cards should reach New task, got " + fromLast);
 
     await page.click("#go-home");
     await page.waitForSelector("#open-apps");

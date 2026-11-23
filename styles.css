@@ -176,6 +176,10 @@ body {
   background: #000;
 }
 
+html, body, .app-shell {
+  scroll-behavior: auto;
+}
+
 .app-shell {
   position: relative;
   display: grid;
@@ -1022,6 +1026,13 @@ p.scale-lines {
 .task-item.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.task-item:focus,
+.task-item:focus-visible,
+.task-check:focus,
+.task-check:focus-visible {
+  transform: none;
 }
 
 .task-item.is-done .tile-title {

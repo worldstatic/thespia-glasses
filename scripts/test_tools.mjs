@@ -90,8 +90,8 @@ test("slides split paragraphs and long text, and mode defaults to scroll", () =>
   assert.equal(data.playMode, "scroll");
 });
 
-test("task screen order is cards then the 2x2 footer, with no skipped ids", () => {
-  assert.equal(nav.APP_VERSION, "v16");
+test("task screen order is cards then a linear footer, with no skipped ids", () => {
+  assert.equal(nav.APP_VERSION, "v17");
   const start = "task-item-0";
   const path = [start];
   let id = start;
@@ -104,14 +104,16 @@ test("task screen order is cards then the 2x2 footer, with no skipped ids", () =
     "task-item-1",
     "task-item-2",
     "open-new-task",
+    "open-task-actions",
     "open-task-lists",
-    "task-item-0",
-    "task-item-1",
+    "go-home",
   ]);
   assert.equal(nav.taskScreenNext("open-new-task", "right", 3), "open-task-actions");
-  assert.equal(nav.taskScreenNext("open-task-actions", "down", 3), "go-home");
+  assert.equal(nav.taskScreenNext("open-task-actions", "down", 3), "open-task-lists");
   assert.equal(nav.taskScreenNext("go-home", "left", 3), "open-task-lists");
   assert.equal(nav.taskScreenNext("open-new-task", "up", 3), "task-item-2");
+  assert.equal(nav.taskScreenNext("go-home", "down", 3), "task-item-0");
+  assert.ok(nav.isTaskFamily("tasks-actions") && nav.isTaskFamily("tasks-edit") && !nav.isTaskFamily("funds-home"));
 });
 
 test("toggleItem flips one checklist bullet and marks the task done when all are checked", () => {
