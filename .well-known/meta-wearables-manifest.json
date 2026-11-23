@@ -6,7 +6,7 @@
   "appearance": {
     "theme_color": "#7ee0ff",
     "icon": {
-      "src": "../icons/icon-512.png",
+      "src": "../icons/icon-512-mono.png",
       "type": "monochrome"
     }
   }

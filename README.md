@@ -34,9 +34,9 @@ That command also runs the privacy scan (`scripts/privacy_scan.py`).
 
 The app opens to the **World Static** home screen:
 
-- A wordmark, a large clock, and the date, updated on the device
+- The World Static logo and wordmark, a large clock, and the date, updated on the device
 - A **Next up** strip that shows your top unfinished Task Card (soonest due day first). Open it to jump to that task
-- A tile grid: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk to Major** work now. **Photo to Texture**, **3D Scan**, and **Overlock Walk** are marked Coming soon
+- A tile grid: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk to Major** work now. **3D Scan** and **Overlock Walk** are marked Coming soon
 
 ## Task Cards
 
@@ -114,9 +114,9 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 - `scale.js` — length parsing, unit conversion, and measurement storage helpers
 - `library.json` — 15 UE 5.6 Blueprint recipes
 - `scale-library.json` — Scale Check reference sizes and tips
-- `manifest.webmanifest` — app name and short name
+- `manifest.webmanifest` — app name, short name, and 192/512 icons
 - `sw.js` — offline app-shell cache
-- `icons/` — monochrome PNG icons (64, 128, 512)
+- `icons/` — World Static logo (SVG source, PNG favicon and 192/512 app icons, plus a monochrome 512 for the glasses launcher)
 - `.well-known/meta-wearables-manifest.json` — glasses app name and icon
 - `.nojekyll` — tell GitHub Pages not to run Jekyll
 - `docs/talk-to-major.md` — how a glasses app can reach Major, and the recommended bridge

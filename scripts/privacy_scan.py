@@ -27,6 +27,7 @@ SHIP_GLOBS = [
     "library.json",
     "scale-library.json",
     "manifest.webmanifest",
+    "icons/logo.svg",
     "README.md",
     "docs/**/*.md",
     ".gitignore",

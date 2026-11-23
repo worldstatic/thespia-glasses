@@ -41,7 +41,6 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         "Talk to Major",
         "Blueprint Help",
         "Overlock Walk",
-        "Photo to Texture",
         "Scale Check",
         "3D Scan",
         "Coming soon",
@@ -56,9 +55,25 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         if needle not in js:
             failures.append(f"app.js missing home/Major content: {needle}")
 
+    if "Photo to Texture" in js:
+        failures.append("app.js still has the Photo to Texture tile")
+    if 'id: "texture"' in js or "icon: \"texture\"" in js:
+        failures.append("app.js still has Photo to Texture placeholder code")
+    if "logo.svg" not in js or "brand-logo" not in js:
+        failures.append("app.js missing World Static logo on the home header")
+    logo = ROOT / "icons/logo.svg"
+    if not logo.is_file():
+        failures.append("icons/logo.svg is missing")
+    else:
+        svg = logo.read_text(encoding="utf-8")
+        if "7ee0ff" not in svg.lower() or "ffb86b" not in svg.lower():
+            failures.append("logo.svg should use the cyan and amber palette")
+        if "<svg" not in svg:
+            failures.append("logo.svg is not an SVG")
+
     if "background: #000" not in css and "background:#000" not in css:
         failures.append("page canvas is not black")
-    if ".tile-grid" not in css or ".hud-clock" not in css or ".next-up" not in css or ".wordmark" not in css:
+    if ".tile-grid" not in css or ".hud-clock" not in css or ".next-up" not in css or ".wordmark" not in css or ".brand-logo" not in css:
         failures.append("styles.css missing HUD home rules")
     if "prefers-reduced-motion" not in css:
         failures.append("styles.css must respect prefers-reduced-motion")
@@ -68,6 +83,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("index.html must load tasks.js and prompter.js")
     if "World Static" not in html:
         failures.append("index.html must use the World Static title")
+    if "icons/logo.svg" not in html or "boot-logo" not in html:
+        failures.append("index.html splash should show the World Static logo")
     if "thespia.hud.major.transport" not in transport:
         failures.append("transport config key missing")
     if "function send(" not in transport and "send(text)" not in transport:
@@ -349,8 +366,10 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v5" not in sw and "${CACHE_PREFIX}v5" not in sw:
-        failures.append("service worker cache version should be v5")
+    if "thespia-blueprint-help-v6" not in sw and "${CACHE_PREFIX}v6" not in sw:
+        failures.append("service worker cache version should be v6")
+    if "logo.svg" not in sw or "icon-192.png" not in sw:
+        failures.append("service worker missing logo or 192 icon")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -857,7 +876,9 @@ def main() -> int:
             "/library.json": ("application/json", b"line-trace"),
             "/scale-library.json": ("application/json", b"default-capsule"),
             "/sw.js": ("text/javascript", b"thespia-blueprint-help-"),
+            "/icons/logo.svg": ("image/svg+xml", b"<svg"),
             "/icons/favicon-64.png": ("image/png", b"\x89PNG"),
+            "/icons/icon-192.png": ("image/png", b"\x89PNG"),
             "/icons/icon-512.png": ("image/png", b"\x89PNG"),
             "/.well-known/meta-wearables-manifest.json": ("application/json", b"Blueprint Help"),
         }

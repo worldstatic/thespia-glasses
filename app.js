@@ -58,7 +58,6 @@
       buttonId: "open-talk-to-major",
       icon: "major",
     },
-    { id: "texture", title: "Photo to Texture", sub: "Coming soon", available: false, icon: "texture" },
     { id: "scan", title: "3D Scan", sub: "Coming soon", available: false, icon: "scan" },
     { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false, icon: "overlock" },
   ];
@@ -554,13 +553,23 @@
     return screen(
       [
         el("header", { className: "screen-header hud-header" }, [
-          el("p", {
-            className: "wordmark",
-            id: "wordmark",
-            dataset: { text: "World Static" },
-            text: "World Static",
-            attrs: { "aria-label": "World Static" },
-          }),
+          el("div", { className: "brand-row" }, [
+            el("img", {
+              className: "brand-logo",
+              src: "./icons/logo.svg",
+              alt: "",
+              width: 28,
+              height: 28,
+              attrs: { "aria-hidden": "true" },
+            }),
+            el("p", {
+              className: "wordmark",
+              id: "wordmark",
+              dataset: { text: "World Static" },
+              text: "World Static",
+              attrs: { "aria-label": "World Static" },
+            }),
+          ]),
           el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
           el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
         ]),
@@ -2458,7 +2467,6 @@
     major: [
       "M5 7.5c0-1.4 1.3-2.5 3-2.5h8c1.7 0 3 1.1 3 2.5v5c0 1.4-1.3 2.5-3 2.5H11l-3.5 2.5V15H8c-1.7 0-3-1.1-3-2.5z",
     ],
-    texture: ["M5 5h14v14H5z", "M5 12h14", "M12 5v14", "M5 8.5h14", "M5 15.5h14", "M8.5 5v14", "M15.5 5v14"],
     scan: ["M12 4l8 4.5v7L12 20l-8-4.5v-7z", "M12 20v-7.5", "M4 8.5l8 4 8-4"],
     overlock: ["M8 11V8.5a4 4 0 0 1 8 0V11", "M7 11h10v9H7z"],
   };
