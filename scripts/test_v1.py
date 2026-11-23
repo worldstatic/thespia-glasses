@@ -38,7 +38,8 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         "Next up",
         "Task Cards",
         "Teleprompter",
-        "Talk to Major",
+        "Talk",
+        "Major or C 2",
         "Blueprint Help",
         "Overlock Walk",
         "Scale Check",
@@ -47,7 +48,11 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         "open-task-cards",
         "open-teleprompter",
         "open-blueprint-help",
-        "open-talk-to-major",
+        "open-talk",
+        "talk-pick-major",
+        "talk-pick-c2",
+        "avatar-major.svg",
+        "avatar-c2.svg",
         "major-message",
         'type: "search"',
         "ThespiaMajor",
@@ -70,6 +75,19 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
             failures.append("logo.svg should use the cyan and amber palette")
         if "<svg" not in svg:
             failures.append("logo.svg is not an SVG")
+    major_av = ROOT / "icons/avatar-major.svg"
+    c2_av = ROOT / "icons/avatar-c2.svg"
+    if not major_av.is_file() or not c2_av.is_file():
+        failures.append("Talk avatars are missing")
+    else:
+        major_svg = major_av.read_text(encoding="utf-8")
+        c2_svg = c2_av.read_text(encoding="utf-8")
+        if "7ee0ff" not in major_svg.lower():
+            failures.append("avatar-major.svg should use the cyan palette")
+        if "cbb4ff" not in c2_svg.lower() or "ffb86b" not in c2_svg.lower():
+            failures.append("avatar-c2.svg should use the violet and amber palette")
+        if "<svg" not in major_svg or "<svg" not in c2_svg:
+            failures.append("Talk avatars are not SVG")
 
     if "background: #000" not in css and "background:#000" not in css:
         failures.append("page canvas is not black")
@@ -87,10 +105,16 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("index.html splash should show the World Static logo")
     if "thespia.hud.major.transport" not in transport:
         failures.append("transport config key missing")
+    if "thespia.hud.talk.threads" not in transport:
+        failures.append("talk threads key missing from major-transport.js")
     if "function send(" not in transport and "send(text)" not in transport:
         failures.append("transport module missing send()")
     if "kind === \"mock\"" not in transport and 'kind === "mock"' not in transport:
         failures.append("mock transport missing")
+    if "kind === \"relay\"" not in transport and 'kind === "relay"' not in transport:
+        failures.append("relay transport missing")
+    if "{ text, to }" not in transport and "text, to" not in transport:
+        failures.append("relay transport must send a to field")
     if "https://" in transport:
         failures.append("major-transport.js must not include an https URL")
     if "speechSynthesis" not in js or "ArrowLeft" not in js:
@@ -366,10 +390,10 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v6" not in sw and "${CACHE_PREFIX}v6" not in sw:
-        failures.append("service worker cache version should be v6")
-    if "logo.svg" not in sw or "icon-192.png" not in sw:
-        failures.append("service worker missing logo or 192 icon")
+    if "thespia-blueprint-help-v7" not in sw and "${CACHE_PREFIX}v7" not in sw:
+        failures.append("service worker cache version should be v7")
+    if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
+        failures.append("service worker missing logo, 192 icon, or Talk avatars")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -877,6 +901,8 @@ def main() -> int:
             "/scale-library.json": ("application/json", b"default-capsule"),
             "/sw.js": ("text/javascript", b"thespia-blueprint-help-"),
             "/icons/logo.svg": ("image/svg+xml", b"<svg"),
+            "/icons/avatar-major.svg": ("image/svg+xml", b"7ee0ff"),
+            "/icons/avatar-c2.svg": ("image/svg+xml", b"cbb4ff"),
             "/icons/favicon-64.png": ("image/png", b"\x89PNG"),
             "/icons/icon-192.png": ("image/png", b"\x89PNG"),
             "/icons/icon-512.png": ("image/png", b"\x89PNG"),
@@ -896,7 +922,7 @@ def main() -> int:
         # Home page markup is built in JS; confirm the shipped script has the tiles
         # and that the served file matches the local copy.
         status, _, body = fetch("/app.js")
-        for needle in (b"hud-clock", b"Next up", b"World Static", b"Task Cards", b"Teleprompter", b"Talk to Major", b"Coming soon", b"Overlock Walk"):
+        for needle in (b"hud-clock", b"Next up", b"World Static", b"Task Cards", b"Teleprompter", b"Major or C 2", b"Coming soon", b"Overlock Walk"):
             if needle not in body:
                 failures.append(f"served app.js missing {needle.decode()}")
 
@@ -936,7 +962,7 @@ def main() -> int:
             print("-", item)
         return 1
     print("PASS")
-    print(f"Loaded World Static home, Task Cards, Teleprompter, Scale Check, Talk to Major transport, {len(recipes)} recipes, health endpoint, and 503 AI fallback at {BASE}")
+    print(f"Loaded World Static home, Task Cards, Teleprompter, Scale Check, Talk transport, {len(recipes)} recipes, health endpoint, and 503 AI fallback at {BASE}")
     return 0
 
 

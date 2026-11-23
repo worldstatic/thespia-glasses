@@ -795,3 +795,53 @@ p.scale-lines {
 .prompter-footer button {
   text-align: center;
 }
+
+/* Talk picker and avatars — additive black display, outline marks */
+.talk-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+button.tile.talk-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+  min-block-size: 10.5rem;
+  padding: 0.85rem 0.6rem;
+}
+
+button.tile.talk-pick .tile-title {
+  font-size: 1.15rem;
+}
+
+.talk-avatar {
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  display: block;
+}
+
+.talk-avatar-lg {
+  width: 4.4rem;
+  height: 4.4rem;
+}
+
+.talk-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.talk-card-head .talk-avatar {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+
+.talk-card-head .step-index {
+  margin: 0;
+}

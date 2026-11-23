@@ -1,91 +1,41 @@
-# Talk to Major — bridge design
+# Talk — Major and C 2
 
-This is a design note for the **World Static** glasses app. It is a design note only. No routine, webhook, account, tunnel, or channel was created while writing it. The glasses app ships a chat UI and a pluggable transport. Live delivery is optional and is configured on the device.
+This note is for the **World Static** glasses app. The chat UI, picker, avatars, and a pluggable transport live in this public repo. The Cloudflare Worker that carries live messages is kept in a **private folder outside this repo**. No tokens, webhook URLs, or keys belong here.
 
-Facts below were checked on 22 Nov 2026 against official Grok Bot help ([Skills and routines](https://docs.x.ai/grok-bot/skills-routines-and-automations), [Use the computer and apps](https://docs.x.ai/grok-bot/computer-and-apps), [Message and collaborate](https://docs.x.ai/grok-bot/chat-and-collaboration)) and [Meta Wearables Web Apps](https://wearables.developer.meta.com/docs/develop/webapps/).
+Facts below were checked on 22 Nov 2026 against official Grok Bot help ([Skills and routines](https://docs.x.ai/grok-bot/skills-routines-and-automations)) and [Meta Wearables Web Apps](https://wearables.developer.meta.com/docs/develop/webapps/).
 
-## Constraints
+## What the glasses app does
 
-- There is no official public “chat with my Grok Bot from an outside app” HTTP API.
-- Glasses web apps can use `fetch` and WebSocket over Wi-Fi or a phone tether. They cannot use the microphone, camera, or notifications. They only load public HTTPS pages.
-- Voice input is the on-glasses composer, opened by activating a text field (`type=search` in this app). Replies can be read aloud with `speechSynthesis`.
-- A Grok Bot routine can start from a **webhook** call or from **email** to the Bot's own address. A `200` from a webhook means a run started, not that the Bot finished. The result is written in the Bot's chat, not returned in that HTTP response.
-- Email the Bot sends from a routine waits as a draft until you press Send. There is no unattended sending.
-- A personal Bot messaged in its own Slack DM replies in the Grok Bot app, not in Slack. A Team Bot can reply in the same Slack thread.
-- This repo will be public. No endpoint URLs, tokens, or secrets belong in the source. Settings are pasted on the glasses and stored in `localStorage`.
+- The **Talk** tile opens a picker: **Major** or **C 2**, each with an original outline avatar (cyan command chevron for Major, violet orb and amber monogram for C 2).
+- Each person has a separate thread in `localStorage` (`thespia.hud.talk.threads`).
+- The composer is a `type=search` field so on-glasses dictation can open. Replies are short cards, paged with Left/Right, with optional read-aloud.
+- While waiting on a live reply, the display shows “Major is thinking...” or “C 2 is thinking...” and times out after about three minutes.
+- `major-transport.js` has two built-in modes:
+  1. **mock** (default). Practice replies. Nothing leaves the device.
+  2. **relay**. `POST { "text", "to" }` to your Worker `/ask`, then poll `/poll?id=...` with the device token. `to` is `major` or `c2`.
 
-The missing official piece is a place the glasses can **read the reply**. Inbound paths can wake Major. They do not, by themselves, give the web app the answer.
+Settings stores only a Worker URL and device token in `localStorage`. The shipped source has no endpoint URLs or secrets.
 
-## What the glasses app already does
+## Live setup
 
-`major-transport.js` defines a small contract:
+Do this after the Worker is deployed and the glasses app is on GitHub Pages (`https://worldstatic.github.io/...`). CORS on the Worker is limited to that origin, so live replies will not work from a `localhost` preview.
 
-1. **mock** (default). Returns short practice cards. Nothing is sent off the device. Use this for desktop and first glasses tests.
-2. **http**. If you later paste an HTTPS URL (and optional token and poll URL) in Settings, the app `POST`s `{ "message", "requestId" }`. It accepts either an immediate `{ "cards": [...] }` or `{ "reply": "..." }`, or it polls your poll URL until a reply appears.
+1. Create one Grok Bot webhook routine on Major (desktop app). After you save it, copy **POST to** (the URL) and **key**. Official docs say senders include the key as `Authorization: Bearer <key>`. The panel also has a **header** field with that full line.
+2. Put those values, plus the device and reply tokens, on the Worker as secrets. The Worker forwards `{ id, text, to }` to that single webhook.
+3. Routine instruction: if `to` is `c2`, Major forwards the message to C 2, waits for C 2's answer, and posts it back tagged as C 2. If `to` is `major`, Major answers and posts tagged as Major. A `200` from the webhook only means the run started.
+4. On the glasses, open Talk → Settings, choose **Live relay**, and paste:
+   - the Worker base URL (no path)
+   - the device token
+   Activate each field to dictate or type (`type=search`). Save. These stay on the device only.
 
-The bridge you host must speak HTTPS, allow this app's origin (CORS, including `OPTIONS`), and must not be committed to this repo.
+Preview mode remains available as a fallback if Settings are cleared.
 
-## Ranked options
+## Privacy
 
-### 1. Recommended: your own HTTPS relay plus a webhook routine
-
-**How it would work later (not built now).** You would ask Major to add a webhook-triggered routine whose instruction is: take the message from the webhook body, answer in short cards for a 600×600 HUD, then POST that reply back to your relay. A small worker you own (for example a Cloudflare Worker) would:
-
-- accept `POST` from the glasses with a device token
-- wake the routine with the official webhook `POST` and bearer key (those stay in the worker, never in this repo)
-- store the later callback / reply under the `requestId`
-- answer the glasses' poll with `{ "status": "done", "cards": [...] }`
-
-**What you would need:** a free Cloudflare account (or any host you control), a webhook routine on Major (created later, in the Grok Bot desktop app, where the POST URL and key are shown), and a one-time paste of your relay URL and device token into Settings on the glasses. CORS must allow the public Pages origin.
-
-**Cost:** usually free on a worker free tier. Each routine run also spends Grok Bot usage. Official limits: 200 runs an hour per routine, 300 across all routines.
-
-**Privacy:** messages would pass through a server you control and through Grok Bot. That is the smallest extra surface if you keep the worker private, rotate the device token, and never put work CSVs or customer data in a chat. Do not use a shared third-party “paste” host for replies.
-
-**Latency:** the webhook `200` is immediate; the useful reply depends on how long the run takes. Plan for tens of seconds, sometimes a couple of minutes, then a short poll.
-
-This is the best fit because the inbound path is official, the glasses can only read public HTTPS, and you keep the secrets off the public repo and off the glasses source.
-
-### 2. Email trigger to the Bot's address
-
-**How it would work.** Grok Bot can claim one address at `mail.grokbot.com` (for example `yourname@mail.grokbot.com`). A routine can run when mail arrives, optionally only from allowed senders. Routines cannot filter by subject. New mail does not wake a Bot without that routine.
-
-**What you would need:** claim the address, create an email-triggered routine, and some way for the glasses to send email. A browser page cannot speak SMTP, so you would still need a mail-sending relay. Replies cannot come back by email on their own: routine-sent mail waits as a draft until you approve it.
-
-**Cost:** the address is part of Grok Bot. A mail relay may be free or paid. Each run spends usage.
-
-**Privacy:** anyone can send mail to the address. Keep the allowed-sender list tight. Mail bodies are another copy of your messages.
-
-**Latency:** worse than a webhook. Mail delivery, routine start, and a manual send approval add minutes, and they block a hands-free walk-around loop.
-
-Useful as a backup wake-up path, not as the primary HUD chat.
-
-### 3. Slack (only a Team Bot is truly two-way)
-
-**How it would work.** Slack is an official place to message some Bots. A Team Bot can be mentioned in a channel or DM and can reply in that same Slack thread. A personal Bot, messaged in its own Slack DM, replies in the Grok Bot app instead of Slack, so the glasses would still not see the answer there.
-
-**What you would need:** Slack connected on the Cursor account, almost certainly a Team Bot (not the personal Major chat), a Slack token, and still a tiny HTTPS proxy because Slack's API is not meant to be called with a secret from a public web app (CORS and token exposure).
-
-**Cost:** Slack itself may be free; you would still spend Grok Bot usage. More accounts to set up.
-
-**Privacy:** Slack would hold the messages. A token in glasses `localStorage` is weaker than a token kept only on a relay you control. This is a larger surface than option 1.
-
-**Latency:** often faster than email once a Team Bot replies in-thread, but the glasses still need a proxy to read that thread, so end-to-end time is similar to a webhook relay.
-
-Skip this unless you already want Major in Slack as a Team Bot for other reasons.
+Do not put work CSVs, customer data, passwords, or personal files in Talk, in this repo, or in Worker logs. The Worker is written not to log message text. Rotate the device and reply tokens if one is ever shared by mistake.
 
 ## What not to do
 
-- Do not put a webhook key, relay token, or customer list in this repository.
+- Do not commit a webhook key, device token, or Worker URL to this repository.
 - Do not expose a port on the computer to the internet, and do not rely on unofficial internal gateways.
-- Do not treat a webhook `200` as “Major has answered.”
-
-
-## What's next
-
-The glasses app now has the chat UI and the mock transport. The next feature, after the other World Static apps, is the live relay in option 1: a Cloudflare Worker (or another HTTPS host you own) plus a webhook routine on Major. The relay URL and device token would be pasted only in Settings on the glasses. That work has not started, and no worker, routine, or secret belongs in this repository until you are ready.
-
-## Suggested order when you are ready
-
-1. Try Talk to Major in the desktop preview and on the glasses with the mock transport.
-2. When you want live replies, we can set up option 1 with you: a worker you own, a webhook routine, and a Settings paste on the glasses. Nothing in that step needs to be public in this repo.
+- Do not treat a webhook `200` as “the reply is ready.”

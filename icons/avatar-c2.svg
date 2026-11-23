@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="c2-avatar-title">
+  <title id="c2-avatar-title">C 2</title>
+  <!-- Original friendly orb: soft violet ring with a clear amber C and 2. -->
+  <circle cx="32" cy="32" r="23" stroke="#cbb4ff" stroke-width="2.4"/>
+  <circle cx="32" cy="32" r="17.6" stroke="#cbb4ff" stroke-width="1.2" opacity="0.85"/>
+  <path d="M32.8 21.6c-8.4 0-12.4 5-12.4 10.4s4 10.4 12.4 10.4" stroke="#ffb86b" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M37.2 24.6c.4-3.6 9.2-3.8 9.2 1.4 0 3.6-5.2 6.2-8.6 9.2h9.4" stroke="#ffb86b" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

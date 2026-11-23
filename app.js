@@ -1,4 +1,4 @@
-/* World Static — home, Blueprint Help, Task Cards, Teleprompter, Scale Check, Talk to Major
+/* World Static — home, Blueprint Help, Task Cards, Teleprompter, Scale Check, Talk (Major or C 2)
    Meta Ray-Ban Display Web App. Directional input arrives as Arrow keys + Enter.
    Web Apps cannot use the microphone; text fields open the on-glasses composer
    (handwriting, dictation, keyboard) on firmware v127+ / Meta AI app v272+.
@@ -50,13 +50,13 @@
       icon: "scale",
     },
     {
-      id: "major",
-      title: "Talk to Major",
-      sub: "Message your assistant",
-      screen: "major",
+      id: "talk",
+      title: "Talk",
+      sub: "Major or C 2",
+      screen: "talk-picker",
       available: true,
-      buttonId: "open-talk-to-major",
-      icon: "major",
+      buttonId: "open-talk",
+      icon: "talk",
     },
     { id: "scan", title: "3D Scan", sub: "Coming soon", available: false, icon: "scan" },
     { id: "overlock", title: "Overlock Walk", sub: "Coming soon", available: false, icon: "overlock" },
@@ -516,8 +516,8 @@
       navigate({ screen: "coming-soon", title: tile.title, appId: tile.id });
       return;
     }
-    if (tile.screen === "major") {
-      navigate({ screen: "major", cardIndex: 0, cards: [], query: "" });
+    if (tile.screen === "talk-picker" || tile.screen === "major") {
+      navigate({ screen: "talk-picker" });
       return;
     }
     if (tile.screen === "tasks") {
@@ -615,12 +615,114 @@
         el("article", { className: "card" }, [
           el("p", {
             className: "step-body",
-            text: `${title} is on the list, but it is not built yet. Task Cards, the Teleprompter, Blueprint Help, Scale Check, and Talk to Major are ready to try.`,
+            text: `${title} is on the list, but it is not built yet. Task Cards, the Teleprompter, Blueprint Help, Scale Check, and Talk are ready to try.`,
           }),
         ]),
       ]),
       el("div", { className: "footer" }, [homeButton()]),
     ]);
+  }
+
+
+  function talkRecipient(state) {
+    const api = majorApi();
+    const value = state && state.to;
+    return api && api.normalizeTo ? api.normalizeTo(value) : value === "c2" ? "c2" : "major";
+  }
+
+  function talkName(to) {
+    const api = majorApi();
+    if (api && api.recipientName) return api.recipientName(to);
+    return to === "c2" ? "C 2" : "Major";
+  }
+
+  function avatarEl(to, className) {
+    const who = to === "c2" ? "c2" : "major";
+    const src = who === "c2" ? "./icons/avatar-c2.svg" : "./icons/avatar-major.svg";
+    return el("img", {
+      className: className || "talk-avatar",
+      src,
+      alt: "",
+      width: 48,
+      height: 48,
+      attrs: { "aria-hidden": "true" },
+    });
+  }
+
+  function openTalk(to, extra) {
+    const api = majorApi();
+    const who = api && api.normalizeTo ? api.normalizeTo(to) : to === "c2" ? "c2" : "major";
+    const last = api && api.lastExchange ? api.lastExchange(who) : null;
+    navigate({
+      screen: "talk",
+      to: who,
+      cardIndex: 0,
+      cards: last && last.cards ? last.cards : [],
+      from: last && last.from ? last.from : who,
+      query: "",
+      notice: "",
+      ...(extra || {}),
+    });
+  }
+
+  function renderTalkPicker() {
+    const api = majorApi();
+    const status = api ? api.statusLabel() : "Talk is unavailable.";
+    const people = [
+      {
+        id: "major",
+        title: "Major",
+        sub: "Commanding assistant",
+        buttonId: "talk-pick-major",
+      },
+      {
+        id: "c2",
+        title: "C 2",
+        sub: "Your personal assistant",
+        buttonId: "talk-pick-c2",
+      },
+    ];
+    return screen(
+      [
+        header("Talk", "Who are you messaging?", status),
+        el("div", { className: "content stack" }, [
+          el(
+            "div",
+            { className: "talk-picker-grid" },
+            people.map((person) =>
+              el(
+                "button",
+                {
+                  type: "button",
+                  className: "tile talk-pick",
+                  id: person.buttonId,
+                  onClick: () => openTalk(person.id),
+                },
+                [
+                  avatarEl(person.id, "talk-avatar talk-avatar-lg"),
+                  el("span", { className: "tile-title", text: person.title }),
+                  el("span", { className: "tile-sub", text: person.sub }),
+                ]
+              )
+            )
+          ),
+        ]),
+        el("div", { className: "footer" }, [
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary",
+              id: "major-settings",
+              onClick: () => navigate({ screen: "major-settings" }),
+            },
+            "Settings"
+          ),
+          homeButton(),
+        ]),
+      ],
+      "talk-picker-screen"
+    );
   }
 
   function majorApi() {
@@ -635,17 +737,23 @@
     const query = state.query || "";
     const pending = Boolean(state.pending);
     const notice = state.notice || "";
-    const status = api ? api.statusLabel() : "Talk to Major is unavailable.";
+    const status = api ? api.statusLabel() : "Talk is unavailable.";
     const hint = api
       ? "On glasses, activate the field to dictate. Web Apps cannot use the microphone directly."
       : "The transport module did not load. Refresh the app.";
 
     let panel;
+    const to = talkRecipient(state);
+    const who = talkName(state.from || to);
+    const thinkingName = talkName(to);
     if (pending) {
       panel = el("article", { className: "step-card", id: "major-card" }, [
-        el("p", { className: "step-index", text: "Sending" }),
-        el("h2", { text: "Please wait" }),
-        el("p", { className: "step-body", text: "Your message is on its way." }),
+        el("div", { className: "talk-card-head" }, [
+          avatarEl(to),
+          el("p", { className: "step-index", text: thinkingName }),
+        ]),
+        el("h2", { text: `${thinkingName} is thinking...` }),
+        el("p", { className: "step-body", text: "Waiting for a reply. This can take up to a few minutes." }),
       ]);
     } else if (card) {
       panel = el(
@@ -654,28 +762,34 @@
           className: "step-card",
           tabIndex: 0,
           id: "major-card",
-          attrs: { "aria-label": `Reply ${index + 1} of ${cards.length}` },
+          attrs: { "aria-label": `${who}, reply ${index + 1} of ${cards.length}` },
         },
         [
-          el("p", { className: "step-index", text: `Reply ${index + 1} of ${cards.length}` }),
+          el("div", { className: "talk-card-head" }, [
+            avatarEl(state.from || to),
+            el("p", { className: "step-index", text: `${who} · Reply ${index + 1} of ${cards.length}` }),
+          ]),
           el("h2", { text: card.title || "Reply" }),
           el("p", { className: "step-body", text: card.body || "" }),
         ]
       );
     } else {
       panel = el("article", { className: "step-card", id: "major-card" }, [
-        el("p", { className: "step-index", text: "Talk to Major" }),
-        el("h2", { text: "Ask Major" }),
+        el("div", { className: "talk-card-head" }, [
+          avatarEl(to),
+          el("p", { className: "step-index", text: "Talk" }),
+        ]),
+        el("h2", { text: `Message ${thinkingName}` }),
         el("p", {
           className: "step-body",
-          text: "Type or dictate a short message, then send. Preview replies work now. Live replies need a bridge you add in Settings.",
+          text: "Type or dictate a short message, then send. Preview replies work now. A live relay is added in Settings.",
         }),
       ]);
     }
 
     return screen(
       [
-        header("World Static", "Talk to Major", status),
+        header("Talk", talkName(talkRecipient(state)), status),
         el("div", { className: "content stack" }, [
           panel,
           notice ? el("p", { className: "status", text: notice, dataset: { kind: state.noticeKind || "" } }) : null,
@@ -701,7 +815,7 @@
                 disabled: pending || !api,
                 onClick: () => submitMajorMessage(),
               },
-              pending ? "Sending…" : "Send"
+              pending ? "Waiting…" : "Send"
             ),
           ]),
         ]),
@@ -709,6 +823,16 @@
           canSpeak()
             ? el("button", { type: "button", className: "secondary", id: "major-speak", onClick: speakMajorCard }, "Speak")
             : null,
+          el(
+            "button",
+            {
+              type: "button",
+              className: "secondary",
+              id: "talk-people",
+              onClick: () => navigate({ screen: "talk-picker" }),
+            },
+            "People"
+          ),
           el(
             "button",
             {
@@ -756,7 +880,9 @@
     const api = majorApi();
     const input = document.getElementById("major-message");
     const query = input && input.value ? input.value.trim() : "";
-    const base = { screen: "major", query, cards: currentState().cards || [], cardIndex: currentState().cardIndex || 0 };
+    const current = currentState();
+    const to = talkRecipient(current);
+    const base = { screen: "talk", to, query, cards: current.cards || [], cardIndex: current.cardIndex || 0, from: current.from || to };
     if (!api) {
       navigate({ ...base, notice: "The transport module did not load.", noticeKind: "error" }, { push: false });
       return;
@@ -766,15 +892,17 @@
       return;
     }
     navigate({ ...base, pending: true, notice: "", cards: [], cardIndex: 0 }, { push: false });
-    const result = await api.send(query);
+    const result = await api.send(query, { to });
     if (result && result.error) {
       navigate(
         {
-          screen: "major",
+          screen: "talk",
+          to,
           query,
           pending: false,
           cards: [],
           cardIndex: 0,
+          from: to,
           notice: result.error,
           noticeKind: "error",
         },
@@ -782,15 +910,18 @@
       );
       return;
     }
+    const preview = result && result.source === "mock";
     navigate(
       {
-        screen: "major",
+        screen: "talk",
+        to,
         query: "",
         pending: false,
         cards: (result && result.cards) || [],
         cardIndex: 0,
-        notice: result && result.source === "mock" ? "Preview only. Nothing left this device." : "",
-        noticeKind: result && result.source === "mock" ? "ok" : "",
+        from: (result && result.from) || to,
+        notice: preview ? "Preview only. Nothing left this device." : "",
+        noticeKind: preview ? "ok" : "",
       },
       { push: false }
     );
@@ -798,13 +929,14 @@
 
   function renderMajorSettings() {
     const api = majorApi();
-    const config = api ? api.loadConfig() : { kind: "mock", endpoint: "", pollUrl: "", token: "" };
+    const config = api ? api.loadConfig() : { kind: "mock", relayUrl: "", token: "" };
+    const live = config.kind === "relay" || config.kind === "http";
     return screen([
-      header("Talk to Major", "Settings", "Stored on this device only"),
+      header("Talk", "Settings", "Stored on this device only"),
       el("div", { className: "content stack" }, [
         el("p", {
           className: "hint",
-          text: "Preview mode works with no account. A live bridge URL is optional and is never stored in the app's source.",
+          text: "Preview mode works with no account. For live replies, paste your Worker URL and device token. Nothing here is stored in the app's source.",
         }),
         el("div", { className: "field-wrap stack" }, [
           el("label", { htmlFor: "major-kind", text: "Reply source" }),
@@ -814,38 +946,28 @@
               { id: "major-kind", className: "field-select" },
               [
                 el("option", { value: "mock", text: "Preview (on this device)" }),
-                el("option", { value: "http", text: "HTTPS bridge I control" }),
+                el("option", { value: "relay", text: "Live relay" }),
               ]
             );
-            select.value = config.kind === "http" ? "http" : "mock";
+            select.value = live ? "relay" : "mock";
             return select;
           })(),
         ]),
         el("div", { className: "field-wrap stack" }, [
-          el("label", { htmlFor: "major-endpoint", text: "Bridge URL (optional)" }),
+          el("label", { htmlFor: "major-endpoint", text: "Relay URL" }),
           el("input", {
             id: "major-endpoint",
-            type: "text",
+            type: "search",
             name: "major-endpoint",
             autocomplete: "off",
-            placeholder: "Paste an HTTPS URL you control",
-            value: config.endpoint || "",
+            placeholder: "Paste your Worker URL",
+            value: config.relayUrl || config.endpoint || "",
             attrs: { enterkeyhint: "next", spellcheck: "false" },
           }),
-          el("label", { htmlFor: "major-poll", text: "Poll URL (optional)" }),
-          el("input", {
-            id: "major-poll",
-            type: "text",
-            name: "major-poll",
-            autocomplete: "off",
-            placeholder: "Optional. Use {id} where the request id goes",
-            value: config.pollUrl || "",
-            attrs: { enterkeyhint: "next", spellcheck: "false" },
-          }),
-          el("label", { htmlFor: "major-token", text: "Device token (optional)" }),
+          el("label", { htmlFor: "major-token", text: "Device token" }),
           el("input", {
             id: "major-token",
-            type: "text",
+            type: "search",
             name: "major-token",
             autocomplete: "off",
             placeholder: "Kept on this device, never in the repo",
@@ -855,13 +977,13 @@
         ]),
         el("p", {
           className: "hint",
-          text: "Do not paste work data, passwords, or personal files here. A live bridge must allow this app's origin (CORS) and speak HTTPS.",
+          text: "Do not paste work data, passwords, or personal files here. The live relay only allows the published app origin.",
         }),
       ]),
       el("div", { className: "footer" }, [
         el("button", { type: "button", className: "secondary primary", id: "save-major-settings", onClick: saveMajorSettings }, "Save"),
         el("button", { type: "button", className: "secondary", id: "clear-major-settings", onClick: clearMajorSettings }, "Clear"),
-        el("button", { type: "button", className: "secondary", onClick: () => navigate({ screen: "major", cards: [], cardIndex: 0, query: "" }) }, "Back"),
+        el("button", { type: "button", className: "secondary", onClick: () => navigate({ screen: "talk-picker" }) }, "Back"),
       ]),
     ]);
   }
@@ -870,11 +992,10 @@
     const api = majorApi();
     if (!api) return;
     const kind = (document.getElementById("major-kind") || {}).value || "mock";
-    const endpoint = (document.getElementById("major-endpoint") || {}).value || "";
-    const pollUrl = (document.getElementById("major-poll") || {}).value || "";
+    const relayUrl = (document.getElementById("major-endpoint") || {}).value || "";
     const token = (document.getElementById("major-token") || {}).value || "";
-    api.saveConfig({ kind, endpoint, pollUrl, token });
-    navigate({ screen: "major", query: "", cards: [], cardIndex: 0, notice: "Saved on this device.", noticeKind: "ok" });
+    api.saveConfig({ kind, relayUrl, token, endpoint: relayUrl, pollUrl: "" });
+    navigate({ screen: "talk-picker", notice: "Saved on this device.", noticeKind: "ok" });
   }
 
   function clearMajorSettings() {
@@ -2464,6 +2585,11 @@
       "M15.7 8.8l-2.4 6",
     ],
     scale: ["M4 8h16v8H4z", "M8 8v3", "M12 8v5", "M16 8v3", "M6 16v-2"],
+    talk: [
+      { tag: "circle", cx: "8", cy: "12", r: "3.2" },
+      { tag: "circle", cx: "16", cy: "12", r: "3.2" },
+      "M11.2 12h1.6",
+    ],
     major: [
       "M5 7.5c0-1.4 1.3-2.5 3-2.5h8c1.7 0 3 1.1 3 2.5v5c0 1.4-1.3 2.5-3 2.5H11l-3.5 2.5V15H8c-1.7 0-3-1.1-3-2.5z",
     ],
@@ -3544,6 +3670,11 @@
         view = renderComingSoon(state);
         lastFocusSelector = "#go-home";
         break;
+      case "talk-picker":
+        view = renderTalkPicker();
+        lastFocusSelector = "#talk-pick-major";
+        break;
+      case "talk":
       case "major":
         view = renderMajor(state);
         lastFocusSelector = state.pending ? "#major-card" : "#major-message";
@@ -3970,7 +4101,7 @@
       }
       return;
     }
-    if (state && state.screen === "major" && (state.cards || []).length) {
+    if (state && (state.screen === "talk" || state.screen === "major") && (state.cards || []).length) {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         updateMajorCard(state, (state.cardIndex || 0) - 1);

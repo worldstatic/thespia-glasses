@@ -1,6 +1,6 @@
 # World Static
 
-A Meta Ray-Ban Display Web App: a glasses home screen named **World Static**, with **Task Cards**, a **Teleprompter**, **Blueprint Help** for Unreal Engine 5.6 (Blueprints only), **Scale Check**, and **Talk to Major**. Built for Thespia work, and for general use at work or home.
+A Meta Ray-Ban Display Web App: a glasses home screen named **World Static**, with **Task Cards**, a **Teleprompter**, **Blueprint Help** for Unreal Engine 5.6 (Blueprints only), **Scale Check**, and **Talk** (Major or C 2). Built for Thespia work, and for general use at work or home.
 
 The static site is meant to be served from the repository root on GitHub Pages (`index.html` at `/`). The optional Python server is only for local preview and AI answers; it is not required for the glasses app.
 
@@ -16,7 +16,7 @@ A large window shows a 600×600 preview frame and keyboard hints. To preview at 
 
 Keyboard stand-ins for the Neural Band / Cap Touch:
 
-- **Left / Right** — previous or next recipe step, Talk to Major reply card, Scale Check library entry, Task Cards list, or Teleprompter segment. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value
+- **Left / Right** — previous or next recipe step, Talk reply card, Scale Check library entry, Task Cards list, or Teleprompter segment. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value
 - **Up / Down** or **Tab** — move between buttons, move through tasks, or change teleprompter speed (and spatial navigation if you start Chrome with `--enable-spatial-navigation`)
 - **Enter** — activate the focused button, mark a task done, pause or resume the teleprompter, or submit a dictated field
 
@@ -36,7 +36,7 @@ The app opens to the **World Static** home screen:
 
 - The World Static logo and wordmark, a large clock, and the date, updated on the device
 - A **Next up** strip that shows your top unfinished Task Card (soonest due day first). Open it to jump to that task
-- A tile grid: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk to Major** work now. **3D Scan** and **Overlock Walk** are marked Coming soon
+- A tile grid: **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** work now. **3D Scan** and **Overlock Walk** are marked Coming soon
 
 ## Task Cards
 
@@ -71,15 +71,11 @@ In **Blueprint Help**, choose **New recipe**. Enter a title, then add steps one 
 
 Favorites, recipes, tasks, scripts, measurements, and your stride stay in `localStorage` on the device.
 
-## Talk to Major
+## Talk (Major or C 2)
 
-The chat panel uses a `type=search` field so the on-glasses composer (and dictation) can open, a Send button, short reply cards you page with Left/Right, and optional read-aloud.
+The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate thread stored in `localStorage` on the device. The chat panel uses a `type=search` field so the on-glasses composer (and dictation) can open, a Send button, short reply cards you page with Left/Right, and optional read-aloud. While a live reply is in flight, the display shows “Major is thinking...” or “C 2 is thinking...”
 
-There is no official public chat API for Grok Bot in this app. Live replies need a bridge you control, pasted in Settings on the device. Until then, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. See [docs/talk-to-major.md](docs/talk-to-major.md) for the design and the recommended bridge.
-
-## Next: live Talk to Major relay
-
-The next planned step, after these apps, is a live Talk to Major connection: a Cloudflare Worker (or another HTTPS relay you own) plus a Grok Bot webhook routine, with the URL and device token pasted only in Settings on the glasses. That work is deferred until the rest of the glasses apps are done. Nothing for it is committed in this repo.
+There is no official public chat API for Grok Bot in this app. Live replies use a Cloudflare Worker you control, with the Worker URL and device token pasted in Settings on the device (`type=search` fields). Until that is configured, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. See [docs/talk-to-major.md](docs/talk-to-major.md) for setup.
 
 ## AI answers for Blueprint Help (optional)
 
@@ -93,7 +89,7 @@ The app must be on a public HTTPS URL (GitHub Pages once enabled). In the Meta A
 
 ## Privacy
 
-This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, and Talk to Major settings stay in `localStorage` on the device. A live bridge URL or token, if you add one, is entered on the glasses and is never part of this source.
+This repo is meant to be public. Do not put personal information, work CSVs, passwords, API keys, or customer data in these files. Favorites, your recipes, Task Cards, Teleprompter scripts, Scale Check measurements, your stride, and Talk settings and threads stay in `localStorage` on the device. A live relay URL or token, if you add one, is entered on the glasses and is never part of this source.
 
 ## What this app assumes from Meta's docs
 

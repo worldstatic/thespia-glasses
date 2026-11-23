@@ -1,21 +1,34 @@
-/* Talk to Major — pluggable transport
+/* Talk — pluggable transport for Major and C 2
    Meta Ray-Ban Display Web App helper. This file ships with no endpoint
-   URLs, tokens, or secrets. A live bridge URL and optional token are
+   URLs, tokens, or secrets. A live relay URL and device token are
    entered on the device and stored only in localStorage.
 */
 (function (global) {
   "use strict";
 
   const CONFIG_KEY = "thespia.hud.major.transport";
-  const KINDS = ["mock", "http"];
-  const DEFAULT_CONFIG = { kind: "mock", endpoint: "", pollUrl: "", token: "" };
-  const POLL_MS = 2500;
-  const POLL_ATTEMPTS = 36;
+  const THREADS_KEY = "thespia.hud.talk.threads";
+  const KINDS = ["mock", "relay", "http"];
+  const RECIPIENTS = ["major", "c2"];
+  const DEFAULT_CONFIG = { kind: "mock", relayUrl: "", token: "", endpoint: "", pollUrl: "" };
+  const POLL_MS = 3000;
+  const POLL_ATTEMPTS = 60;
   const MAX_CARDS = 6;
   const MAX_CARD_CHARS = 240;
+  const MAX_THREAD = 20;
 
   function blankConfig() {
     return { ...DEFAULT_CONFIG };
+  }
+
+  function normalizeTo(value) {
+    const v = String(value || "").trim().toLowerCase();
+    if (v === "c2" || v === "c 2") return "c2";
+    return "major";
+  }
+
+  function recipientName(to) {
+    return normalizeTo(to) === "c2" ? "C 2" : "Major";
   }
 
   function loadConfig() {
@@ -24,9 +37,12 @@
       if (!raw) return blankConfig();
       const parsed = JSON.parse(raw);
       const kind = KINDS.includes(parsed.kind) ? parsed.kind : "mock";
+      const relayUrl = typeof parsed.relayUrl === "string" ? parsed.relayUrl.trim() : "";
+      const endpoint = typeof parsed.endpoint === "string" ? parsed.endpoint.trim() : "";
       return {
         kind,
-        endpoint: typeof parsed.endpoint === "string" ? parsed.endpoint.trim() : "",
+        relayUrl: relayUrl || (kind === "relay" ? endpoint : ""),
+        endpoint,
         pollUrl: typeof parsed.pollUrl === "string" ? parsed.pollUrl.trim() : "",
         token: typeof parsed.token === "string" ? parsed.token : "",
       };
@@ -41,7 +57,8 @@
   function saveConfig(next) {
     const config = {
       kind: KINDS.includes(next.kind) ? next.kind : "mock",
-      endpoint: String(next.endpoint || "").trim(),
+      relayUrl: String(next.relayUrl || next.endpoint || "").trim(),
+      endpoint: String(next.endpoint || next.relayUrl || "").trim(),
       pollUrl: String(next.pollUrl || "").trim(),
       token: String(next.token || ""),
     };
@@ -49,7 +66,7 @@
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
       return config;
     } catch (err) {
-      console.warn("Could not save Talk to Major settings on this device.");
+      console.warn("Could not save Talk settings on this device.");
       return config;
     }
   }
@@ -59,6 +76,68 @@
       localStorage.removeItem(CONFIG_KEY);
     } catch (_ignored) {}
     return blankConfig();
+  }
+
+  function blankThreads() {
+    return { major: [], c2: [] };
+  }
+
+  function loadThreads() {
+    try {
+      const raw = localStorage.getItem(THREADS_KEY);
+      if (!raw) return blankThreads();
+      const parsed = JSON.parse(raw);
+      return {
+        major: Array.isArray(parsed.major) ? parsed.major : [],
+        c2: Array.isArray(parsed.c2) ? parsed.c2 : [],
+      };
+    } catch (err) {
+      try {
+        localStorage.removeItem(THREADS_KEY);
+      } catch (_ignored) {}
+      return blankThreads();
+    }
+  }
+
+  function saveThreads(threads) {
+    const next = {
+      major: Array.isArray(threads.major) ? threads.major.slice(-MAX_THREAD) : [],
+      c2: Array.isArray(threads.c2) ? threads.c2.slice(-MAX_THREAD) : [],
+    };
+    try {
+      localStorage.setItem(THREADS_KEY, JSON.stringify(next));
+      return next;
+    } catch (err) {
+      console.warn("Could not save Talk threads on this device.");
+      return next;
+    }
+  }
+
+  function loadThread(to) {
+    const key = normalizeTo(to);
+    return loadThreads()[key] || [];
+  }
+
+  function lastExchange(to) {
+    const list = loadThread(to);
+    return list.length ? list[list.length - 1] : null;
+  }
+
+  function appendThread(to, entry) {
+    const key = normalizeTo(to);
+    const all = loadThreads();
+    const item = {
+      id: entry.id || "",
+      to: key,
+      from: normalizeTo(entry.from || key),
+      text: String(entry.text || "").slice(0, 1000),
+      reply: String(entry.reply || "").slice(0, 4000),
+      cards: Array.isArray(entry.cards) ? entry.cards : [],
+      ts: entry.ts || Date.now(),
+    };
+    all[key] = (all[key] || []).concat(item).slice(-MAX_THREAD);
+    saveThreads(all);
+    return item;
   }
 
   function requestId() {
@@ -126,12 +205,16 @@
   function isConfigured(config) {
     const cfg = config || loadConfig();
     if (cfg.kind === "mock") return true;
+    if (cfg.kind === "relay") return Boolean(cfg.relayUrl && cfg.token);
     if (cfg.kind === "http") return Boolean(cfg.endpoint);
     return false;
   }
 
   function statusLabel(config) {
     const cfg = config || loadConfig();
+    if (cfg.kind === "relay" && cfg.relayUrl && cfg.token) {
+      return "Live relay on this device";
+    }
     if (cfg.kind === "http" && cfg.endpoint) {
       return "Live bridge on this device";
     }
@@ -150,6 +233,10 @@
     return template.split("{id}").join(encodeURIComponent(id));
   }
 
+  function baseUrl(url) {
+    return String(url || "").trim().replace(/\/+$/, "");
+  }
+
   async function readJson(response) {
     const text = await response.text();
     if (!text) return {};
@@ -160,8 +247,8 @@
     }
   }
 
-  async function pollForReply(config, id) {
-    const url = fillUrl(config.pollUrl, id);
+  async function pollRelay(config, pollUrl, id) {
+    const url = fillUrl(pollUrl, id);
     if (!url) return null;
     for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
       if (attempt > 0) await sleep(POLL_MS);
@@ -174,11 +261,14 @@
         throw new Error("The bridge could not be checked for a reply.");
       }
       const data = await readJson(response);
-      const cards = normalizeCards(data, "Major");
-      if (cards && cards.length) return cards;
+      const who = recipientName(data.from || data.to);
+      const cards = normalizeCards(data, who);
+      if (cards && cards.length) {
+        return { cards, from: normalizeTo(data.from || data.to), reply: data.reply || "", id: data.id || id };
+      }
       const status = data && data.status;
       if (status === "error") {
-        throw new Error(String(data.message || "The bridge reported an error."));
+        throw new Error(String(data.error || "The bridge reported an error."));
       }
       if (status && status !== "pending" && status !== "accepted" && status !== "running") {
         break;
@@ -187,7 +277,36 @@
     return null;
   }
 
-  async function sendHttp(config, text) {
+  async function sendRelay(config, text, to) {
+    if (!config.relayUrl || !config.token) {
+      throw new Error("Add the relay URL and device token in Settings before sending a live message.");
+    }
+    const base = baseUrl(config.relayUrl);
+    const response = await fetch(`${base}/ask`, {
+      method: "POST",
+      headers: buildHeaders(config),
+      body: JSON.stringify({ text, to }),
+    });
+    if (response.status === 401) {
+      throw new Error("The device token was not accepted. Check Settings.");
+    }
+    if (response.status === 429) {
+      throw new Error("Too many messages. Wait a moment and try again.");
+    }
+    if (!response.ok) {
+      throw new Error("The relay did not accept the message. Check the URL in Settings.");
+    }
+    const data = await readJson(response);
+    const id = data.id;
+    if (!id) throw new Error("The relay did not return a message id.");
+    const polled = await pollRelay(config, `${base}/poll?id={id}`, id);
+    if (polled && polled.cards && polled.cards.length) {
+      return { ...polled, requestId: id, source: "relay", to };
+    }
+    throw new Error("No reply in time. Try again in a moment.");
+  }
+
+  async function sendHttp(config, text, to) {
     if (!config.endpoint) {
       throw new Error("Add a bridge URL in Settings before sending a live message.");
     }
@@ -195,64 +314,83 @@
     const response = await fetch(config.endpoint, {
       method: "POST",
       headers: buildHeaders(config),
-      body: JSON.stringify({ message: text, requestId: id }),
+      body: JSON.stringify({ message: text, text, requestId: id, to }),
     });
     if (!response.ok) {
       throw new Error("The bridge did not accept the message. Check the URL in Settings.");
     }
     const data = await readJson(response);
-    const immediate = normalizeCards(data, "Major");
-    if (immediate && immediate.length) return { cards: immediate, requestId: id, source: "http" };
+    const immediate = normalizeCards(data, recipientName(to));
+    if (immediate && immediate.length) return { cards: immediate, requestId: id, source: "http", to };
     if (config.pollUrl) {
-      const polled = await pollForReply(config, (data && data.requestId) || id);
-      if (polled && polled.length) return { cards: polled, requestId: id, source: "http" };
-      throw new Error("No reply yet. Try again in a moment, or check that the bridge can post a reply back.");
+      const polled = await pollRelay(config, config.pollUrl, (data && data.requestId) || data.id || id);
+      if (polled && polled.cards.length) return { ...polled, requestId: id, source: "http", to };
+      throw new Error("No reply in time. Try again in a moment.");
     }
-    throw new Error("The bridge accepted the message but returned no reply. Add a poll URL in Settings if replies arrive later.");
+    throw new Error("The bridge accepted the message but returned no reply.");
   }
 
-  async function sendMock(text) {
+  async function sendMock(text, to) {
     await sleep(350);
+    const name = recipientName(to);
     const quoted = String(text || "").trim().slice(0, 200) || "(empty)";
-    return {
-      source: "mock",
-      cards: [
-        {
-          title: "Preview only",
-          body: "This is a practice reply. Nothing was sent to Major or to any server.",
-        },
-        {
-          title: "Your message",
-          body: quoted,
-        },
-        {
-          title: "Live replies later",
-          body: "When you are ready, open Settings and paste a bridge URL you control. This app never ships with a hidden address or key.",
-        },
-      ],
-    };
+    const cards = [
+      {
+        title: "Preview only",
+        body: `This is a practice reply from ${name}. Nothing was sent off this device.`,
+      },
+      {
+        title: "Your message",
+        body: quoted,
+      },
+      {
+        title: "Live replies later",
+        body: "When the relay is live, open Settings and paste the Worker URL and device token. This app never ships with a hidden address or key.",
+      },
+    ];
+    return { source: "mock", cards, from: to, to, reply: cards.map((c) => c.body).join(" ") };
   }
 
-  async function send(text) {
+  async function send(text, opts) {
     const message = String(text || "").trim();
+    const to = normalizeTo(opts && opts.to);
     if (!message) {
-      return { error: "Type or dictate a message first.", cards: [] };
+      return { error: "Type or dictate a message first.", cards: [], to };
     }
     const config = loadConfig();
     try {
-      if (config.kind === "http") {
-        return await sendHttp(config, message);
+      let result;
+      if (config.kind === "relay") {
+        result = await sendRelay(config, message, to);
+      } else if (config.kind === "http") {
+        result = await sendHttp(config, message, to);
+      } else {
+        result = await sendMock(message, to);
       }
-      return await sendMock(message);
+      const from = normalizeTo(result.from || to);
+      const cards = result.cards || [];
+      const reply = result.reply || cards.map((card) => card.body).join(" ");
+      appendThread(to, {
+        id: result.requestId || result.id || "",
+        to,
+        from,
+        text: message,
+        reply,
+        cards,
+        ts: Date.now(),
+      });
+      return { ...result, cards, from, to };
     } catch (err) {
       const safe = err && err.message ? String(err.message) : "Could not send the message.";
-      return { error: safe, cards: [] };
+      return { error: safe, cards: [], to };
     }
   }
 
   const api = {
     CONFIG_KEY,
+    THREADS_KEY,
     KINDS,
+    RECIPIENTS,
     loadConfig,
     saveConfig,
     clearConfig,
@@ -260,6 +398,11 @@
     statusLabel,
     cardsFromText,
     send,
+    normalizeTo,
+    recipientName,
+    loadThread,
+    lastExchange,
+    appendThread,
   };
 
   global.ThespiaMajor = api;
