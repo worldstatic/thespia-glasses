@@ -41,13 +41,13 @@ The app opens to a glanceable **World Static** dashboard (no app tiles on home):
 - A short line with the last message from Major or C 2
 - One primary **Apps** button
 
-App tiles live on a separate **Apps** screen. **Add spend** is there: type an amount in a `type=search` field, press Enter or Arrow Down to move to the label, then press Enter on the label or Save to add it to today's running total. Arrow Up/Down also move between Amount, Label, Save, and Home while a field is focused. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
+App tiles live on a separate **Apps** screen. **Add spend** is a two-step form so the glasses composer cannot write into the wrong box: first Amount, then Next, then an optional Label, then Save. Each step shows only one `type=search` field. Spent entries still add to today's running total. **Task Cards**, **Teleprompter**, **Blueprint Help**, **Scale Check**, and **Talk** also work now. **3D Scan** and **Overlock Walk** are marked Coming soon. **Home** returns to the dashboard.
 
 ## Task Cards
 
 General-purpose lists, defaulting to **Work**, **Home**, and **Projects**. You can create and rename lists. Each task has a title (dictate in a `search` field), an optional note, done/undone, and an optional due day (`today`, `Friday`, or `Nov 25`).
 
-Arrow keys move spatially through each card, **Prev list** / **Next list**, then **New task**, **Actions**, **Lists**, and **Home**, which sit in the same document flow so a downward swipe can reach the bottom bar. Long lists scroll with the page. Enter marks the selected task done or opens it from the list. **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
+Arrow keys move spatially through each card, **Prev list** / **Next list**, then **New task**, **Actions**, **Lists**, and **Home**, which sit in the same document flow so a downward swipe can reach the bottom bar. Long lists scroll with the page. Enter marks the selected task done or opens it from the list. **New task** and **Edit task** also use one field at a time (Title, then Note, then Due). **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
 
 The shipped seed tasks are generic examples only. Do not put work CSVs or customer data into a backup you share.
 
@@ -105,13 +105,14 @@ Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.develop
 - Web Apps cannot use the microphone. Voice input uses the on-glasses composer (activate the search field to dictate). That needs firmware v127+ and Meta AI app v272+.
 - Text to speech uses `window.speechSynthesis`. App data uses `localStorage`. A service worker can cache the app shell after a first online visit.
 - The glasses app icon comes from `.well-known/meta-wearables-manifest.json`. This repo includes a `.nojekyll` file so Pages serves that folder. The app name and short name are **World Static**.
-- Home and Apps show a small **v14** label so you can confirm the cache you have. If the glasses still show v13, leave the app completely and open it again (on a network) so the service worker can update; v14 uses `skipWaiting`, `clients.claim`, network-first HTML/JS, and a one-time reload on `controllerchange`.
-- Apps and Talk Settings include an **Input debug** toggle (off by default). It shows the last five input events (`type`, `key`, `code`, `keyCode`, `deltaY`) so a Neural Band swipe can be reported if a gesture is not arriving as an arrow key.
+- Home, Apps, and Settings show a small **v15** label so you can confirm the cache you have. If the glasses still show an older version, leave the app completely and open it again (on a network) so the service worker can update; v15 uses `skipWaiting`, `clients.claim`, network-first HTML/JS, and a one-time reload on `controllerchange`.
+- **Settings** (from the Apps screen) has a **Color scheme** (Cyan, Amber, Green, Magenta, White) and a **Font** (HUD, Sans, Mono, System). The canvas stays black; accents, outlines, and type change instantly and are stored in `localStorage` on the device, applied before first paint. The default typeface is Rajdhani (HUD). Font files are self-hosted under `fonts/` with their SIL Open Font License texts; the app never loads fonts from a CDN. Apps and Settings also include an **Input debug** toggle (off by default). It shows the last five input events (`type`, `key`, `code`, `keyCode`, `deltaY`) so a Neural Band swipe can be reported if a gesture is not arriving as an arrow key.
 - Sources for Neural Band / spatial navigation: [Input and navigation](https://wearables.developer.meta.com/docs/develop/webapps/build/input-and-navigation/) (updated 27 Sep 2026), [Build web apps](https://wearables.developer.meta.com/docs/develop/webapps/build/), [Test](https://wearables.developer.meta.com/docs/develop/webapps/test/) (`--enable-spatial-navigation`), and [How to use Meta Neural Band](https://www.meta.com/help/ai-glasses/764536076119235/).
 
 ## File list
 
-- `index.html`, `styles.css`, `app.js`, `funds.js`, `focus-nav.js` — World Static dashboard, Apps, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, daily funds, and glasses focus helpers
+- `index.html`, `styles.css`, `app.js`, `funds.js`, `focus-nav.js`, `theme.js` — World Static dashboard, Apps, Settings, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, daily funds, color/font preferences, and glasses focus helpers
+- `fonts/` — self-hosted OFL typefaces (Rajdhani, Inter, JetBrains Mono)
 - `tasks.js` — Task Cards storage, due-day parsing, and export/import
 - `prompter.js` — Teleprompter storage, segment parsing, and export/import
 - `major-transport.js` — pluggable message transport (mock preview, optional on-device HTTPS bridge)

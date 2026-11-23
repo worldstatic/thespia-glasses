@@ -204,8 +204,18 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
     focus_nav = (ROOT / "focus-nav.js").read_text(encoding="utf-8")
     if "speechSynthesis" not in js or ("ArrowLeft" not in js and "ArrowLeft" not in focus_nav):
         failures.append("input or TTS hooks missing")
-    if "app-version" not in js or "v14" not in js:
-        failures.append("Home/Apps must show a v14 version label")
+    if "app-version" not in js or "v15" not in js:
+        failures.append("Home/Apps must show a v15 version label")
+    if "theme.js" not in html:
+        failures.append("index.html must load theme.js")
+    if 'data-theme="cyan"' not in html or "thespia.hud.theme" not in html:
+        failures.append("index.html must apply the saved color scheme before paint")
+    if "funds-next" not in js or "goFundsStep" not in js:
+        failures.append("Add spend must show Amount and Label one field at a time")
+    if 'step: "title"' not in js and "step: 'title'" not in js:
+        failures.append("New task must start on a single Title field")
+    if "open-settings" not in js or "theme-picker" not in js or "font-picker" not in js:
+        failures.append("Settings must include color scheme and font pickers")
     if "toggle-input-debug" not in js or "input-debug" not in js:
         failures.append("Input debug overlay toggle missing")
     if "keydown" not in js or "capture" not in js:
@@ -481,16 +491,18 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v14" not in sw and "${CACHE_PREFIX}v14" not in sw:
-        failures.append("service worker cache version should be v14")
+    if "thespia-blueprint-help-v15" not in sw and "${CACHE_PREFIX}v15" not in sw:
+        failures.append("service worker cache version should be v15")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
         failures.append("service worker must precache funds.js and the HUD background")
     if "focus-nav.js" not in sw:
         failures.append("service worker must precache focus-nav.js")
+    if "theme.js" not in sw or "Rajdhani-Regular.woff2" not in sw:
+        failures.append("service worker must precache theme.js and HUD font files")
     if "skipWaiting" not in sw or "clients.claim" not in sw:
-        failures.append("service worker must skipWaiting and clients.claim so v14 can replace a stuck v13 cache")
+        failures.append("service worker must skipWaiting and clients.claim so v15 can replace a stuck cache")
     if "isNetworkFirst" not in sw:
         failures.append("service worker must fetch HTML/JS network-first")
 
@@ -995,6 +1007,18 @@ def main() -> int:
         out = (funds_test.stdout or "") + (funds_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"funds: {line}")
+
+    theme_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_theme.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if theme_test.returncode != 0:
+        failures.append("theme and font tests failed")
+        out = (theme_test.stdout or "") + (theme_test.stderr or "")
+        for line in out.strip().splitlines()[-12:]:
+            failures.append(f"theme: {line}")
 
     nav_test = subprocess.run(
         ["node", "--test", str(ROOT / "scripts/test_nav.mjs")],

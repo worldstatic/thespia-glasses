@@ -491,7 +491,7 @@
 
   function appVersionLabel() {
     const nav = window.WorldStaticFocusNav;
-    const ver = (nav && nav.APP_VERSION) || "v14";
+    const ver = (nav && nav.APP_VERSION) || "v15";
     return el("p", { className: "app-version", id: "app-version", text: ver });
   }
 
@@ -893,10 +893,117 @@
         el("div", { className: "content stack" }, [
           el("div", { className: "tile-grid", attrs: { role: "list" } }, appTiles()),
         ]),
-        el("div", { className: "footer" }, [inputDebugButton(), homeButton()]),
+        el("div", { className: "footer" }, [
+          el("button", { type: "button", className: "secondary", id: "open-settings", onClick: () => navigate({ screen: "settings" }) }, "Settings"),
+          homeButton(),
+        ]),
       ],
       "apps-screen"
     );
+  }
+
+  function liveFieldValue(id, fallback) {
+    const node = document.getElementById(id);
+    if (node && node.value != null) return node.value;
+    return fallback == null ? "" : String(fallback);
+  }
+
+  function fundsStep(state) {
+    return state && state.step === "label" ? "label" : "amount";
+  }
+
+  function taskFormStep(state) {
+    return state && (state.step === "note" || state.step === "due") ? state.step : "title";
+  }
+
+  function themeApi() {
+    return window.WorldStaticTheme || null;
+  }
+
+  function appearanceToggle(kind, preset, selected) {
+    return el(
+      "button",
+      {
+        type: "button",
+        id: kind + "-" + preset.id,
+        className: selected ? "kind-toggle selected" : "kind-toggle",
+        onClick: () => {
+          const api = themeApi();
+          if (!api) return;
+          if (kind === "theme") api.saveTheme(preset.id);
+          else api.saveFont(preset.id);
+          const state = currentState();
+          if (state && state.screen === "settings") navigate({ ...state }, { push: false });
+        },
+        attrs: { "aria-pressed": selected ? "true" : "false" },
+      },
+      preset.title
+    );
+  }
+
+  function renderSettings() {
+    const api = themeApi();
+    const theme = api ? api.loadTheme() : "cyan";
+    const font = api ? api.loadFont() : "rajdhani";
+    const themes = api && api.THEMES ? api.THEMES : [];
+    const fonts = api && api.FONTS ? api.FONTS : [];
+    return screen(
+      [
+        header("World Static", "Settings", "Color and font stay on this device"),
+        appVersionLabel(),
+        el("div", { className: "content stack" }, [
+          el("p", { className: "field-label", id: "theme-picker-label", text: "Color scheme" }),
+          el(
+            "div",
+            {
+              className: "kind-toggle-row wrap",
+              id: "theme-picker",
+              attrs: { role: "group", "aria-labelledby": "theme-picker-label" },
+            },
+            themes.map((preset) => appearanceToggle("theme", preset, preset.id === theme))
+          ),
+          el("p", { className: "field-label", id: "font-picker-label", text: "Font" }),
+          el(
+            "div",
+            {
+              className: "kind-toggle-row wrap",
+              id: "font-picker",
+              attrs: { role: "group", "aria-labelledby": "font-picker-label" },
+            },
+            fonts.map((preset) => appearanceToggle("font", preset, preset.id === font))
+          ),
+          el("p", {
+            className: "hint",
+            text: "The display stays black. Color changes the outlines and type. HUD is the default typeface.",
+          }),
+          inputDebugButton(),
+        ]),
+        el("div", { className: "footer" }, [backButton(), homeButton()]),
+      ],
+      "settings-screen"
+    );
+  }
+
+  function goFundsStep(state, step, { push = false } = {}) {
+    navigate(
+      {
+        screen: "funds-entry",
+        step: step,
+        amount: liveFieldValue("funds-amount", state && state.amount),
+        label: liveFieldValue("funds-label", state && state.label),
+        notice: "",
+      },
+      { push: push }
+    );
+  }
+
+  function goTaskStep(state, step, { push = false } = {}) {
+    const fields = {
+      title: liveFieldValue("task-title", state && state.title),
+      note: liveFieldValue("task-note", state && state.note),
+      due: liveFieldValue("task-due", state && state.due),
+    };
+    navigate({ ...state, screen: "tasks-edit", step: step, notice: "", ...fields }, { push: push });
   }
 
   function renderFundsEntry(state) {
@@ -914,39 +1021,53 @@
             : null,
           el("p", {
             className: "hint",
-            text: "Type an amount. Enter moves to the label; Enter on the label or Save adds it to today's total. It stays on this device.",
+            text:
+              fundsStep(state) === "label"
+                ? "Optional label. Dictate or type, then Save. Only this field is on the screen so the glasses composer cannot write into Amount."
+                : "Dictate or type the amount, then choose Next. Only one field is shown at a time.",
           }),
-          el("div", { className: "field-wrap stack" }, [
-            el("label", { htmlFor: "funds-amount", text: "Amount" }),
-            el("input", {
-              id: "funds-amount",
-              type: "search",
-              name: "funds-amount",
-              autocomplete: "off",
-              placeholder: "Amount, like 5",
-              value: (state && state.amount) || "",
-              attrs: { enterkeyhint: "done", inputmode: "decimal", spellcheck: "false" },
-            }),
-            el("label", { htmlFor: "funds-label", text: "Label (optional)" }),
-            el("input", {
-              id: "funds-label",
-              type: "search",
-              name: "funds-label",
-              autocomplete: "off",
-              placeholder: "What was it for?",
-              value: (state && state.label) || "",
-              attrs: { enterkeyhint: "done", spellcheck: "true" },
-            }),
-          ]),
+          fundsStep(state) === "label"
+            ? el("div", { className: "field-wrap stack" }, [
+                el("p", { className: "step-index", text: "Label · 2 of 2" }),
+                el("label", { htmlFor: "funds-label", text: "Label (optional)" }),
+                el("input", {
+                  id: "funds-label",
+                  type: "search",
+                  name: "funds-label",
+                  autocomplete: "off",
+                  placeholder: "What was it for?",
+                  value: (state && state.label) || "",
+                  attrs: { enterkeyhint: "done", spellcheck: "true" },
+                }),
+              ])
+            : el("div", { className: "field-wrap stack" }, [
+                el("p", { className: "step-index", text: "Amount · 1 of 2" }),
+                el("label", { htmlFor: "funds-amount", text: "Amount" }),
+                el("input", {
+                  id: "funds-amount",
+                  type: "search",
+                  name: "funds-amount",
+                  autocomplete: "off",
+                  placeholder: "Amount, like 5",
+                  value: (state && state.amount) || "",
+                  attrs: { enterkeyhint: "next", inputmode: "decimal", spellcheck: "false" },
+                }),
+              ]),
         ]),
-        el("div", { className: "footer" }, [
-          el(
-            "button",
-            { type: "button", className: "secondary primary", id: "save-funds-spend", onClick: submitAddSpend },
-            "Save"
-          ),
-          homeButton(),
-        ]),
+        el(
+          "div",
+          { className: "footer" },
+          fundsStep(state) === "label"
+            ? [
+                el("button", { type: "button", className: "secondary primary", id: "save-funds-spend", onClick: submitAddSpend }, "Save"),
+                el("button", { type: "button", className: "secondary", id: "funds-back", onClick: () => goFundsStep(state, "amount") }, "Back"),
+                homeButton(),
+              ]
+            : [
+                el("button", { type: "button", className: "secondary primary", id: "funds-next", onClick: () => goFundsStep(state, "label") }, "Next"),
+                homeButton(),
+              ]
+        ),
       ],
       "funds-entry-screen"
     );
@@ -998,7 +1119,7 @@
               type: "button",
               className: "secondary",
               id: "funds-budget-add",
-              onClick: () => navigate({ screen: "funds-entry", amount: "", label: "" }),
+              onClick: () => navigate({ screen: "funds-entry", step: "amount", amount: "", label: "" }),
             },
             "Add spend"
           ),
@@ -1054,16 +1175,17 @@
 
   function submitAddSpend() {
     const api = fundsApi();
-    const amount = ((document.getElementById("funds-amount") || {}).value || "").trim();
-    const label = ((document.getElementById("funds-label") || {}).value || "").trim();
+    const state = currentState();
+    const amount = liveFieldValue("funds-amount", state && state.amount).trim();
+    const label = liveFieldValue("funds-label", state && state.label).trim();
     if (!api) {
-      navigate({ screen: "funds-entry", amount, label, notice: "Funds could not load.", noticeKind: "error" }, { push: false });
+      navigate({ screen: "funds-entry", step: fundsStep(state), amount, label, notice: "Funds could not load.", noticeKind: "error" }, { push: false });
       return;
     }
     const result = api.addSpend(api.loadAndPersist(), amount, label);
     if (!result.ok) {
       navigate(
-        { screen: "funds-entry", amount, label, notice: result.message, noticeKind: "error" },
+        { screen: "funds-entry", step: amount ? "label" : "amount", amount, label, notice: result.message, noticeKind: "error" },
         { push: false }
       );
       return;
@@ -3468,6 +3590,7 @@
         screen: "tasks-edit",
         listId,
         taskId: task ? task.id : "",
+        step: "title",
         title: task ? task.title : "",
         note: task ? task.note : "",
         due: task ? task.due || "" : "",
@@ -3716,59 +3839,88 @@
   }
 
   function renderTaskEditor(state) {
+    const step = taskFormStep(state);
+    const labels = { title: "Title · 1 of 3", note: "Note · 2 of 3", due: "Due day · 3 of 3" };
+    const field =
+      step === "note"
+        ? el("div", { className: "field-wrap stack" }, [
+            el("p", { className: "step-index", text: labels.note }),
+            el("label", { htmlFor: "task-note", text: "Note (optional)" }),
+            el("input", {
+              id: "task-note",
+              type: "search",
+              name: "task-note",
+              autocomplete: "off",
+              placeholder: "A short note",
+              value: state.note || "",
+              attrs: { enterkeyhint: "next", maxlength: "240", spellcheck: "true" },
+            }),
+          ])
+        : step === "due"
+          ? el("div", { className: "field-wrap stack" }, [
+              el("p", { className: "step-index", text: labels.due }),
+              el("label", { htmlFor: "task-due", text: "Due day (optional)" }),
+              el("input", {
+                id: "task-due",
+                type: "search",
+                name: "task-due",
+                autocomplete: "off",
+                placeholder: "Today, Friday, or Nov 25",
+                value: state.due || "",
+                attrs: { enterkeyhint: "done", maxlength: "40", spellcheck: "false" },
+              }),
+            ])
+          : el("div", { className: "field-wrap stack" }, [
+              el("p", { className: "step-index", text: labels.title }),
+              el("label", { htmlFor: "task-title", text: "Title" }),
+              el("input", {
+                id: "task-title",
+                type: "search",
+                name: "task-title",
+                autocomplete: "off",
+                placeholder: "What needs doing?",
+                value: state.title || "",
+                attrs: { enterkeyhint: "next", maxlength: "80", spellcheck: "true" },
+              }),
+            ]);
+    const footer =
+      step === "due"
+        ? [
+            el("button", { type: "button", className: "secondary primary", id: "save-task", onClick: saveTaskFromForm }, "Save"),
+            el("button", { type: "button", className: "secondary", id: "task-step-back", onClick: () => goTaskStep(state, "note") }, "Back"),
+            homeButton(),
+          ]
+        : step === "note"
+          ? [
+              el("button", { type: "button", className: "secondary primary", id: "task-step-next", onClick: () => goTaskStep(state, "due") }, "Next"),
+              el("button", { type: "button", className: "secondary", id: "task-step-back", onClick: () => goTaskStep(state, "title") }, "Back"),
+              homeButton(),
+            ]
+          : [
+              el("button", { type: "button", className: "secondary primary", id: "task-step-next", onClick: () => goTaskStep(state, "note") }, "Next"),
+              backButton(),
+              homeButton(),
+            ];
     return screen([
-      header("Task Cards", state.taskId ? "Edit task" : "New task", "Dictate or type, then save"),
+      header("Task Cards", state.taskId ? "Edit task" : "New task", "One field at a time"),
       el("div", { className: "content stack" }, [
-        el("div", { className: "field-wrap stack" }, [
-          el("label", { htmlFor: "task-title", text: "Title" }),
-          el("input", {
-            id: "task-title",
-            type: "search",
-            name: "task-title",
-            autocomplete: "off",
-            placeholder: "What needs doing?",
-            value: state.title || "",
-            attrs: { enterkeyhint: "next", maxlength: "80", spellcheck: "true" },
-          }),
-          el("label", { htmlFor: "task-note", text: "Note (optional)" }),
-          el("input", {
-            id: "task-note",
-            type: "search",
-            name: "task-note",
-            autocomplete: "off",
-            placeholder: "A short note",
-            value: state.note || "",
-            attrs: { enterkeyhint: "next", maxlength: "240", spellcheck: "true" },
-          }),
-          el("label", { htmlFor: "task-due", text: "Due day (optional)" }),
-          el("input", {
-            id: "task-due",
-            type: "search",
-            name: "task-due",
-            autocomplete: "off",
-            placeholder: "Today, Friday, or Nov 25",
-            value: state.due || "",
-            attrs: { enterkeyhint: "done", maxlength: "40", spellcheck: "false" },
-          }),
-        ]),
+        el("p", {
+          className: "hint",
+          text: "Dictate or type in this field, then choose Next or Save. Only one text box is on the screen so input cannot land in a hidden field.",
+        }),
+        field,
         state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
       ]),
-      el("div", { className: "footer" }, [
-        el("button", { type: "button", className: "secondary primary", id: "save-task", onClick: saveTaskFromForm }, "Save"),
-        backButton(),
-        homeButton(),
-      ]),
+      el("div", { className: "footer" }, footer),
     ]);
   }
 
   function readTaskForm() {
-    const title = document.getElementById("task-title");
-    const note = document.getElementById("task-note");
-    const due = document.getElementById("task-due");
+    const state = currentState();
     return {
-      title: title && title.value ? title.value : "",
-      note: note && note.value ? note.value : "",
-      due: due && due.value ? due.value : "",
+      title: liveFieldValue("task-title", state && state.title),
+      note: liveFieldValue("task-note", state && state.note),
+      due: liveFieldValue("task-due", state && state.due),
     };
   }
 
@@ -4463,7 +4615,8 @@
         break;
       case "tasks-edit":
         view = renderTaskEditor(state);
-        lastFocusSelector = "#task-title";
+        lastFocusSelector =
+          taskFormStep(state) === "note" ? "#task-note" : taskFormStep(state) === "due" ? "#task-due" : "#task-title";
         break;
       case "tasks-move":
         view = renderTaskMove(state);
@@ -4513,9 +4666,13 @@
         view = renderApps();
         lastFocusSelector = "#open-add-spend";
         break;
+      case "settings":
+        view = renderSettings();
+        lastFocusSelector = "#theme-" + ((themeApi() && themeApi().loadTheme()) || "cyan");
+        break;
       case "funds-entry":
         view = renderFundsEntry(state);
-        lastFocusSelector = "#funds-amount";
+        lastFocusSelector = fundsStep(state) === "label" ? "#funds-label" : "#funds-amount";
         break;
       case "funds-budget":
         view = renderFundsBudget(state);
@@ -4789,15 +4946,14 @@
       submitMajorMessage();
       return;
     }
-    if (keyIsEnter && event.target && (event.target.id === "funds-amount" || event.target.id === "funds-label" || event.target.id === "save-funds-spend")) {
-      const action = navApi && typeof navApi.fundsEnter === "function" ? navApi.fundsEnter(event.target.id) : null;
+    if (keyIsEnter && event.target && event.target.id === "save-funds-spend") {
       event.preventDefault();
-      if (action && action.action === "focus") {
-        const next = document.getElementById(action.id);
-        if (next && typeof next.focus === "function") next.focus();
-        return;
-      }
       submitAddSpend();
+      return;
+    }
+    if (keyIsEnter && event.target && event.target.id === "funds-next") {
+      event.preventDefault();
+      goFundsStep(currentState(), "label");
       return;
     }
     if (keyIsEnter && event.target && event.target.id === "funds-budget") {
@@ -4810,19 +4966,13 @@
       saveNextUpFromForm();
       return;
     }
-    if (keyIsEnter && event.target && event.target.id === "task-title") {
+    if (keyIsEnter && event.target && event.target.id === "task-step-next") {
       event.preventDefault();
-      const note = document.getElementById("task-note");
-      if (note && typeof note.focus === "function") note.focus();
+      const current = currentState();
+      goTaskStep(current, taskFormStep(current) === "note" ? "due" : "note");
       return;
     }
-    if (keyIsEnter && event.target && event.target.id === "task-note") {
-      event.preventDefault();
-      const due = document.getElementById("task-due");
-      if (due && typeof due.focus === "function") due.focus();
-      return;
-    }
-    if (keyIsEnter && event.target && event.target.id === "task-due") {
+    if (keyIsEnter && event.target && event.target.id === "save-task") {
       event.preventDefault();
       saveTaskFromForm();
       return;

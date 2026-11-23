@@ -157,7 +157,7 @@ async function main() {
     await page.waitForSelector("#open-apps", { timeout: 15000 });
 
     const version = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (version !== "v14") failures.push("Home version label should read v14, got " + version);
+    if (version !== "v15") failures.push("Home version label should read v15, got " + version);
 
     const homeIds = await reachableByArrows(page);
     const homeMissing = missing(homeIds, ["open-funds", "open-next-up", "open-current-task", "open-talk-preview", "open-apps"]);
@@ -166,7 +166,7 @@ async function main() {
     await page.click("#open-apps");
     await page.waitForSelector("#open-task-cards");
     const appsVersion = await page.$eval("#app-version", (el) => el.textContent.trim());
-    if (appsVersion !== "v14") failures.push("Apps version label should read v14, got " + appsVersion);
+    if (appsVersion !== "v15") failures.push("Apps version label should read v15, got " + appsVersion);
 
     await page.click("#open-task-cards");
     await page.waitForSelector("#open-new-task");
@@ -182,19 +182,65 @@ async function main() {
     await page.waitForSelector("#open-add-spend");
     await page.click("#open-add-spend");
     await page.waitForSelector("#funds-amount");
-    await page.focus("#funds-amount");
-    await press(page, "ArrowDown");
-    let fundsFocus = await currentId(page);
-    if (fundsFocus !== "funds-label") {
-      await press(page, "ArrowRight");
-      fundsFocus = await currentId(page);
+    const amountCount = await page.$$eval('input[type="search"]', (els) => els.length);
+    if (amountCount !== 1) failures.push("Add spend Amount step must have exactly one search field, found " + amountCount);
+    if (await page.$("#funds-label")) failures.push("Label must not be in the DOM on the Amount step");
+    const fundsAmountIds = await reachableByArrows(page);
+    const fundsAmountMissing = missing(fundsAmountIds, ["funds-amount", "funds-next", "go-home"]);
+    if (fundsAmountMissing.length) failures.push("Add spend Amount arrows missed " + fundsAmountMissing.join(", ") + " (reached " + fundsAmountIds.join(", ") + ")");
+    await page.click("#funds-next");
+    await page.waitForSelector("#funds-label");
+    if (await page.$("#funds-amount")) failures.push("Amount must not be in the DOM on the Label step");
+    await page.focus("#funds-label");
+    await page.evaluate(() => {
+      const el = document.getElementById("funds-label");
+      el.focus();
+      el.value = "coffee";
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: "coffee", inputType: "insertText" }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const labelLanded = await page.evaluate(() => ({
+      active: document.activeElement && document.activeElement.id,
+      label: (document.getElementById("funds-label") || {}).value,
+      amount: document.getElementById("funds-amount") && document.getElementById("funds-amount").value,
+    }));
+    if (labelLanded.active !== "funds-label" || labelLanded.label !== "coffee") {
+      failures.push("Add spend: input on Label landed in " + JSON.stringify(labelLanded));
     }
-    if (fundsFocus !== "funds-label") {
-      failures.push("Add spend: Arrow from Amount should reach Label, focus was " + fundsFocus);
+    if (labelLanded.amount != null) failures.push("Add spend: Amount field was present while dictating the label");
+    const fundsLabelIds = await reachableByArrows(page);
+    const fundsLabelMissing = missing(fundsLabelIds, ["funds-label", "save-funds-spend", "go-home"]);
+    if (fundsLabelMissing.length) failures.push("Add spend Label arrows missed " + fundsLabelMissing.join(", ") + " (reached " + fundsLabelIds.join(", ") + ")");
+
+    await page.click("#go-home");
+    await page.waitForSelector("#open-apps");
+    await page.click("#open-apps");
+    await page.waitForSelector("#open-task-cards");
+    await page.click("#open-task-cards");
+    await page.waitForSelector("#open-new-task");
+    await page.click("#open-new-task");
+    await page.waitForSelector("#task-title");
+    if (await page.$("#task-note") || await page.$("#task-due")) failures.push("New task Title step must not include Note or Due fields");
+    await page.click("#task-step-next");
+    await page.waitForSelector("#task-note");
+    if (await page.$("#task-title")) failures.push("Title must not be in the DOM on the Note step");
+    await page.focus("#task-note");
+    await page.evaluate(() => {
+      const el = document.getElementById("task-note");
+      el.focus();
+      el.value = "Bring bag";
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: "Bring bag", inputType: "insertText" }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const noteLanded = await page.evaluate(() => ({
+      active: document.activeElement && document.activeElement.id,
+      note: (document.getElementById("task-note") || {}).value,
+      title: document.getElementById("task-title") && document.getElementById("task-title").value,
+    }));
+    if (noteLanded.active !== "task-note" || noteLanded.note !== "Bring bag") {
+      failures.push("New task: input on Note landed in " + JSON.stringify(noteLanded));
     }
-    const fundsIds = await reachableByArrows(page);
-    const fundsMissing = missing(fundsIds, ["funds-amount", "funds-label", "save-funds-spend", "go-home"]);
-    if (fundsMissing.length) failures.push("Add spend arrows missed " + fundsMissing.join(", ") + " (reached " + fundsIds.join(", ") + ")");
+    if (noteLanded.title != null) failures.push("New task: Title field was present while dictating the note");
 
     await page.click("#go-home");
     await page.waitForSelector("#open-apps");
@@ -203,6 +249,23 @@ async function main() {
     const composer = await currentId(page);
     if (composer !== "major-message") {
       failures.push("Talk should open on the composer, focus was " + composer);
+    }
+    const talkSearch = await page.$$eval('input[type="search"]', (els) => els.map((el) => el.id));
+    if (talkSearch.length !== 1 || talkSearch[0] !== "major-message") {
+      failures.push("Talk must have exactly one search field (the composer), found " + talkSearch.join(","));
+    }
+    await page.evaluate(() => {
+      const el = document.getElementById("major-message");
+      el.focus();
+      el.value = "Hello there";
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: "Hello there", inputType: "insertText" }));
+    });
+    const talkLanded = await page.evaluate(() => ({
+      active: document.activeElement && document.activeElement.id,
+      value: (document.getElementById("major-message") || {}).value,
+    }));
+    if (talkLanded.active !== "major-message" || talkLanded.value !== "Hello there") {
+      failures.push("Talk composer input landed in " + JSON.stringify(talkLanded));
     }
     const talkIds = await reachableByArrows(page);
     const talkRequired = ["talk-msg-0", "talk-msg-1", "major-message", "major-send", "talk-people", "major-settings", "go-home"];

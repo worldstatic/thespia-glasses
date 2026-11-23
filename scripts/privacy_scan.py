@@ -24,7 +24,10 @@ SHIP_GLOBS = [
     "funds.js",
     "prompter.js",
     "focus-nav.js",
+    "theme.js",
     "styles.css",
+    "fonts/**/*.md",
+    "fonts/**/*.txt",
     "sw.js",
     "library.json",
     "scale-library.json",
@@ -47,6 +50,7 @@ ALLOWED_EMAIL_DOMAINS = {
     "example.com",
     "example.org",
     "example.net",
+    "indiantypefoundry.com",  # official Rajdhani OFL copyright contact
 }
 
 # Placeholder local-part values allowed with mail.grokbot.com in design docs.

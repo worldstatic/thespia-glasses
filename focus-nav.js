@@ -12,7 +12,7 @@
   "use strict";
 
   const TASK_FOOTER_IDS = ["open-new-task", "open-task-actions", "open-task-lists", "go-home"];
-  const APP_VERSION = "v14";
+  const APP_VERSION = "v15";
 
   function isDisabled(el) {
     return Boolean(el && (el.disabled || el.getAttribute("aria-disabled") === "true"));
@@ -226,8 +226,42 @@
     };
   }
 
+  const FUNDS_STEPS = ["amount", "label"];
+  const TASK_STEPS = ["title", "note", "due"];
+
+  function formSteps(kind) {
+    return kind === "task" ? TASK_STEPS : FUNDS_STEPS;
+  }
+
+  function formFieldId(kind, step) {
+    if (kind === "task") {
+      if (step === "note") return "task-note";
+      if (step === "due") return "task-due";
+      return "task-title";
+    }
+    return step === "label" ? "funds-label" : "funds-amount";
+  }
+
+  function nextFormStep(kind, step) {
+    const steps = formSteps(kind);
+    const i = steps.indexOf(step);
+    const index = i < 0 ? 0 : i;
+    if (index >= steps.length - 1) {
+      return { step: steps[steps.length - 1], done: true, fieldId: formFieldId(kind, steps[steps.length - 1]) };
+    }
+    const next = steps[index + 1];
+    return { step: next, done: false, fieldId: formFieldId(kind, next) };
+  }
+
+  function prevFormStep(kind, step) {
+    const steps = formSteps(kind);
+    const i = Math.max(0, steps.indexOf(step));
+    const prev = steps[Math.max(0, i - 1)];
+    return { step: prev, done: false, fieldId: formFieldId(kind, prev) };
+  }
+
   function fundsEnter(fieldId) {
-    if (fieldId === "funds-amount") return { action: "focus", id: "funds-label" };
+    if (fieldId === "funds-amount") return { action: "step", step: "label", id: "funds-label" };
     if (fieldId === "funds-label" || fieldId === "save-funds-spend") return { action: "save" };
     return { action: "none" };
   }
@@ -274,6 +308,10 @@
     spatialNext: spatialNext,
     normalizeNav: normalizeNav,
     describeEvent: describeEvent,
+    formSteps: formSteps,
+    formFieldId: formFieldId,
+    nextFormStep: nextFormStep,
+    prevFormStep: prevFormStep,
     fundsEnter: fundsEnter,
     taskArrow: taskArrow,
     talkDefaultFocus: talkDefaultFocus,

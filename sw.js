@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "thespia-blueprint-help-";
-const CACHE_NAME = `${CACHE_PREFIX}v14`;
+const CACHE_NAME = `${CACHE_PREFIX}v15`;
 const APP_SHELL = [
   new URL("./", self.registration.scope).href,
   new URL("./index.html", self.registration.scope).href,
@@ -11,6 +11,14 @@ const APP_SHELL = [
   new URL("./funds.js", self.registration.scope).href,
   new URL("./prompter.js", self.registration.scope).href,
   new URL("./focus-nav.js", self.registration.scope).href,
+  new URL("./theme.js", self.registration.scope).href,
+  new URL("./fonts/rajdhani/Rajdhani-Regular.woff2", self.registration.scope).href,
+  new URL("./fonts/rajdhani/Rajdhani-SemiBold.woff2", self.registration.scope).href,
+  new URL("./fonts/rajdhani/Rajdhani-Bold.woff2", self.registration.scope).href,
+  new URL("./fonts/inter/Inter-Regular.woff2", self.registration.scope).href,
+  new URL("./fonts/inter/Inter-SemiBold.woff2", self.registration.scope).href,
+  new URL("./fonts/jetbrains-mono/JetBrainsMono-Regular.woff2", self.registration.scope).href,
+  new URL("./fonts/jetbrains-mono/JetBrainsMono-SemiBold.woff2", self.registration.scope).href,
   new URL("./library.json", self.registration.scope).href,
   new URL("./scale-library.json", self.registration.scope).href,
   new URL("./manifest.webmanifest", self.registration.scope).href,

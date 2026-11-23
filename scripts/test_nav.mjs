@@ -64,7 +64,8 @@ const TALK_IDS = [
   "go-home",
 ];
 
-const FUNDS_IDS = ["funds-amount", "funds-label", "save-funds-spend", "go-home"];
+const FUNDS_AMOUNT_IDS = ["funds-amount", "funds-next", "go-home"];
+const FUNDS_LABEL_IDS = ["funds-label", "save-funds-spend", "funds-back", "go-home"];
 
 test("Talk opens on the composer; Arrow Up enters history; Arrow Down from any bubble reaches the input", () => {
   assert.equal(nav.talkDefaultFocus(), "major-message");
@@ -120,16 +121,16 @@ test("Task Cards: Arrow Down/Right from the last card reaches New task, Actions,
   assert.equal(model.taskIndex, 2);
 });
 
-test("Add spend: arrows and Tab leave type=search fields; Enter in Amount moves to Label", () => {
-  assert.equal(press(FUNDS_IDS, "funds-amount", ["ArrowDown"]).focus, "funds-label");
-  assert.equal(press(FUNDS_IDS, "funds-amount", ["ArrowRight"]).focus, "funds-label");
-  assert.equal(press(FUNDS_IDS, "funds-amount", ["Tab"]).focus, "funds-label");
-  assert.equal(press(FUNDS_IDS, "funds-label", ["ArrowDown"]).focus, "save-funds-spend");
-  assert.equal(press(FUNDS_IDS, "save-funds-spend", ["ArrowDown"]).focus, "go-home");
-  assert.equal(press(FUNDS_IDS, "go-home", ["ArrowUp", "ArrowUp", "ArrowUp"]).focus, "funds-amount");
-  assert.deepEqual(nav.fundsEnter("funds-amount"), { action: "focus", id: "funds-label" });
-  assert.deepEqual(nav.fundsEnter("funds-label"), { action: "save" });
-  assert.deepEqual(nav.fundsEnter("save-funds-spend"), { action: "save" });
+test("Add spend and New task are one-field wizards", () => {
+  assert.deepEqual(nav.nextFormStep("funds", "amount"), { step: "label", done: false, fieldId: "funds-label" });
+  assert.equal(nav.nextFormStep("funds", "label").done, true);
+  assert.equal(nav.prevFormStep("funds", "label").step, "amount");
+  assert.equal(nav.formFieldId("funds", "amount"), "funds-amount");
+  assert.equal(nav.nextFormStep("task", "title").fieldId, "task-note");
+  assert.equal(nav.nextFormStep("task", "note").fieldId, "task-due");
+  assert.equal(nav.nextFormStep("task", "due").done, true);
+  assert.equal(press(FUNDS_AMOUNT_IDS, "funds-amount", ["ArrowDown"]).focus, "funds-next");
+  assert.equal(press(FUNDS_LABEL_IDS, "funds-label", ["ArrowDown"]).focus, "save-funds-spend");
 });
 
 test("normalizeNav accepts key, code, keyCode, Down aliases, Tab, and wheel", () => {

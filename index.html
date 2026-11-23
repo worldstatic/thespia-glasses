@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="cyan" data-font="rajdhani">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,18 @@
   <meta name="mrbd-web-app-capable" content="yes">
   <meta name="theme-color" content="#7ee0ff">
   <title>World Static</title>
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem("thespia.hud.theme") || "cyan";
+        var font = localStorage.getItem("thespia.hud.font") || "rajdhani";
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-font", font);
+      } catch (err) {}
+    })();
+  </script>
+  <link rel="preload" href="./fonts/rajdhani/Rajdhani-Regular.woff2" as="font" type="font/woff2">
+  <link rel="preload" href="./fonts/rajdhani/Rajdhani-SemiBold.woff2" as="font" type="font/woff2">
   <link rel="icon" type="image/png" sizes="64x64" href="./icons/favicon-64.png">
   <link rel="icon" type="image/svg+xml" href="./icons/logo.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
@@ -33,6 +45,7 @@
   <script src="./funds.js" defer></script>
   <script src="./prompter.js" defer></script>
   <script src="./focus-nav.js" defer></script>
+  <script src="./theme.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
