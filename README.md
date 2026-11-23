@@ -14,11 +14,11 @@ Then open http://127.0.0.1:8765/
 
 A large window shows a 600×600 preview frame and keyboard hints. To preview at the exact glasses viewport, open Chrome DevTools and set the device size to 600×600.
 
-Keyboard stand-ins for the Neural Band / Cap Touch:
+Keyboard stand-ins for the Neural Band / Cap Touch (thumb swipe is Up/Down/Left/Right; pinch or tap is Enter; middle-finger tap is system Back):
 
-- **Left / Right** — previous or next recipe step, Scale Check library entry, Task Cards list, or Teleprompter segment. On the Scale Check converter readout, Left/Right change the step size and Up/Down change the value. In a Talk thread, Up/Down on the thread scrolls older or newer messages
-- **Up / Down** or **Tab** — move between buttons, move through tasks, or change teleprompter speed (and spatial navigation if you start Chrome with `--enable-spatial-navigation`)
-- **Enter** — activate the focused button, mark a task done, pause or resume the teleprompter, or submit a dictated field
+- **Arrow keys** — Chromium spatial navigation moves focus to the nearest on-screen control in that direction. The same keys work here if you start Chrome with `--enable-spatial-navigation`. Up/Down also change teleprompter speed or a Scale Check converter value when that readout is focused.
+- **Tab / Shift+Tab** — move to the next or previous control (useful on a desktop keyboard)
+- **Enter** — activate the focused button, mark a task done, pause or resume the teleprompter, or submit a dictated field (Add spend: Enter in Amount moves to Label; Enter in Label or on Save adds the amount)
 
 Optional: the [Meta Ray-Ban Display Simulator](https://wearables.developer.meta.com/docs/develop/webapps/test/) Chrome extension can preview the additive display. It is not a substitute for device testing, and it does not reproduce the composer or the Neural Band exactly.
 
@@ -47,7 +47,7 @@ App tiles live on a separate **Apps** screen. **Add spend** is there: type an am
 
 General-purpose lists, defaulting to **Work**, **Home**, and **Projects**. You can create and rename lists. Each task has a title (dictate in a `search` field), an optional note, done/undone, and an optional due day (`today`, `Friday`, or `Nov 25`).
 
-Left/Right switch lists. Up/Down move through tasks. Arrow Down from the last card reaches **New task** and the rest of the bottom bar; Arrow Up from New task returns to the last card. Long lists scroll the focused card into view. Enter marks the selected task done or opens it from the list. **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
+Arrow keys move spatially through each card, **Prev list** / **Next list**, then **New task**, **Actions**, **Lists**, and **Home**, which sit in the same document flow so a downward swipe can reach the bottom bar. Long lists scroll with the page. Enter marks the selected task done or opens it from the list. **Actions** can edit, move, reorder, or delete a task. **Lists** can rename or add a list, clear done tasks, or export and import a JSON backup. Progress is shown per list. Everything stays in `localStorage` on this device.
 
 The shipped seed tasks are generic examples only. Do not put work CSVs or customer data into a backup you share.
 
@@ -101,14 +101,17 @@ This repo is meant to be public. Do not put personal information, work CSVs, pas
 Read on 22 Nov 2026 from the [Meta Wearables Web Apps](https://wearables.developer.meta.com/docs/develop/webapps/) guides.
 
 - Display is an additive 600×600 waveguide. Use a black canvas and high-contrast outlined surfaces. Size from the viewport; treat 600×600 as a validation target.
-- Neural Band and Cap Touch become `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Enter`. Arrow Up/Down move focus between controls on a screen, including while a `type=search` field is focused (so dictation fields do not trap the arrows). Left/Right in a text field still move the caret. Enter activates the focused control, or moves to the next field when a form spells that out (Add spend Amount → Label).
+- Neural Band and Cap Touch become `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Enter`. The glasses WebView then uses Chromium spatial navigation: it focuses the nearest visible control in that direction, or scrolls the page if nothing is there. This app keeps each screen in one document scroll (no inner `overflow: auto` traps) so the Task Cards bottom bar and the Talk composer, Speak, People, and Settings stay geometrically reachable. Arrows inside a `type=search` field are intercepted so dictation fields cannot trap focus. Enter activates the focused control, or moves Amount to Label on Add spend.
 - Web Apps cannot use the microphone. Voice input uses the on-glasses composer (activate the search field to dictate). That needs firmware v127+ and Meta AI app v272+.
 - Text to speech uses `window.speechSynthesis`. App data uses `localStorage`. A service worker can cache the app shell after a first online visit.
 - The glasses app icon comes from `.well-known/meta-wearables-manifest.json`. This repo includes a `.nojekyll` file so Pages serves that folder. The app name and short name are **World Static**.
+- Home and Apps show a small **v14** label so you can confirm the cache you have. If the glasses still show v13, leave the app completely and open it again (on a network) so the service worker can update; v14 uses `skipWaiting`, `clients.claim`, network-first HTML/JS, and a one-time reload on `controllerchange`.
+- Apps and Talk Settings include an **Input debug** toggle (off by default). It shows the last five input events (`type`, `key`, `code`, `keyCode`, `deltaY`) so a Neural Band swipe can be reported if a gesture is not arriving as an arrow key.
+- Sources for Neural Band / spatial navigation: [Input and navigation](https://wearables.developer.meta.com/docs/develop/webapps/build/input-and-navigation/) (updated 27 Sep 2026), [Build web apps](https://wearables.developer.meta.com/docs/develop/webapps/build/), [Test](https://wearables.developer.meta.com/docs/develop/webapps/test/) (`--enable-spatial-navigation`), and [How to use Meta Neural Band](https://www.meta.com/help/ai-glasses/764536076119235/).
 
 ## File list
 
-- `index.html`, `styles.css`, `app.js`, `funds.js` — World Static dashboard, Apps, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, and daily funds
+- `index.html`, `styles.css`, `app.js`, `funds.js`, `focus-nav.js` — World Static dashboard, Apps, Task Cards, Teleprompter, Blueprint Help, Scale Check, Talk, daily funds, and glasses focus helpers
 - `tasks.js` — Task Cards storage, due-day parsing, and export/import
 - `prompter.js` — Teleprompter storage, segment parsing, and export/import
 - `major-transport.js` — pluggable message transport (mock preview, optional on-device HTTPS bridge)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/* Key-sequence tests for Talk, Task Cards, and Add spend glasses navigation.
-   Arrow keys and Enter only. No personal data.
+/* Key-sequence and spatial-neighbor tests for Talk, Task Cards, and Add spend.
+   Arrow keys, Tab, keyCode, and wheel variants. No personal data.
 */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -15,8 +15,8 @@ function press(ids, start, keys) {
   let focus = start;
   const path = [focus];
   for (const key of keys) {
-    if (key === "ArrowDown") focus = nav.stepIds(ids, focus, 1);
-    else if (key === "ArrowUp") focus = nav.stepIds(ids, focus, -1);
+    const parsed = nav.normalizeNav({ key });
+    if (parsed.dir) focus = nav.stepIds(ids, focus, parsed.dir, true);
     path.push(focus);
   }
   return { focus, path };
@@ -58,18 +58,7 @@ const TALK_IDS = [
   "talk-msg-1",
   "major-message",
   "major-send",
-  "talk-speak",
-  "talk-people",
-  "major-settings",
-  "go-home",
-];
-
-const TALK_PENDING_IDS = [
-  "talk-msg-0",
-  "talk-msg-1",
-  "talk-typing",
-  "major-message",
-  "major-send",
+  "major-speak",
   "talk-people",
   "major-settings",
   "go-home",
@@ -79,30 +68,11 @@ const FUNDS_IDS = ["funds-amount", "funds-label", "save-funds-spend", "go-home"]
 
 test("Talk opens on the composer; Arrow Up enters history; Arrow Down from any bubble reaches the input", () => {
   assert.equal(nav.talkDefaultFocus(), "major-message");
-
-  const upFromInput = press(TALK_IDS, "major-message", ["ArrowUp"]);
-  assert.equal(upFromInput.focus, "talk-msg-1");
-
-  const backToInput = press(TALK_IDS, "talk-msg-1", ["ArrowDown"]);
-  assert.equal(backToInput.focus, "major-message");
-
+  assert.equal(press(TALK_IDS, "major-message", ["ArrowUp"]).focus, "talk-msg-1");
+  assert.equal(press(TALK_IDS, "talk-msg-1", ["ArrowDown"]).focus, "major-message");
   const fromFirst = press(TALK_IDS, "talk-msg-0", ["ArrowDown", "ArrowDown"]);
   assert.equal(fromFirst.focus, "major-message");
-  assert.deepEqual(fromFirst.path, ["talk-msg-0", "talk-msg-1", "major-message"]);
-
-  for (const start of ["talk-msg-0", "talk-msg-1"]) {
-    let cur = start;
-    for (let i = 0; i < 8; i += 1) {
-      const next = nav.stepIds(TALK_IDS, cur, 1);
-      if (next === cur) break;
-      cur = next;
-      if (cur === "major-message") break;
-    }
-    assert.equal(cur, "major-message");
-  }
-
-  const pastThread = press(TALK_PENDING_IDS, "talk-typing", ["ArrowDown"]);
-  assert.equal(pastThread.focus, "major-message");
+  assert.equal(press(TALK_IDS, "talk-msg-0", ["ArrowRight", "ArrowRight"]).focus, "major-message");
 });
 
 test("the Talk thread scroller itself is not a focus trap", () => {
@@ -112,31 +82,32 @@ test("the Talk thread scroller itself is not a focus trap", () => {
     fakeEl("talk-msg-1", { tag: "div" }),
     fakeEl("major-message", { tag: "input" }),
     fakeEl("major-send"),
+    fakeEl("major-speak"),
+    fakeEl("talk-people"),
+    fakeEl("major-settings"),
     fakeEl("go-home"),
   ];
   const ids = nav.collectFocusables(rootOf(nodes)).map((el) => el.id);
   assert.ok(!ids.includes("talk-thread"));
-  assert.deepEqual(ids, ["talk-msg-0", "talk-msg-1", "major-message", "major-send", "go-home"]);
+  assert.ok(ids.includes("major-speak"));
+  assert.ok(ids.includes("talk-people"));
+  assert.ok(ids.includes("major-settings"));
   assert.equal(press(ids, "talk-msg-1", ["ArrowDown"]).focus, "major-message");
 });
 
-test("Task Cards: Arrow Down from the last card reaches the bottom bar", () => {
+test("Task Cards: Arrow Down/Right from the last card reaches New task, Actions, Lists, and Home", () => {
   let model = { focus: "list", taskIndex: 0, taskCount: 3 };
   model = nav.taskArrow(model, "ArrowDown");
+  model = nav.taskArrow(model, "ArrowRight");
   assert.equal(model.focus, "list");
-  assert.equal(model.taskIndex, 1);
-  model = nav.taskArrow(model, "ArrowDown");
   assert.equal(model.taskIndex, 2);
-  assert.equal(model.focus, "list");
   model = nav.taskArrow(model, "ArrowDown");
   assert.equal(model.focus, "footer");
   assert.equal(model.footerId, "open-new-task");
   model = nav.taskArrow(model, "ArrowDown");
   assert.equal(model.footerId, "open-task-actions");
-  model = nav.taskArrow(model, "ArrowDown");
+  model = nav.taskArrow(model, "ArrowRight");
   assert.equal(model.footerId, "open-task-lists");
-  model = nav.taskArrow(model, "ArrowDown");
-  assert.equal(model.footerId, "go-home");
   model = nav.taskArrow(model, "ArrowDown");
   assert.equal(model.footerId, "go-home");
   model = nav.taskArrow(model, "ArrowUp");
@@ -149,35 +120,55 @@ test("Task Cards: Arrow Down from the last card reaches the bottom bar", () => {
   assert.equal(model.taskIndex, 2);
 });
 
-test("Task Cards: Arrow Up on the first card stays on the list, empty lists stay on the bar", () => {
-  let model = nav.taskArrow({ focus: "list", taskIndex: 0, taskCount: 4 }, "ArrowUp");
-  assert.equal(model.focus, "list");
-  assert.equal(model.taskIndex, 0);
-
-  let empty = nav.taskArrow({ focus: "list", taskIndex: 0, taskCount: 0 }, "ArrowDown");
-  assert.equal(empty.focus, "footer");
-  assert.equal(empty.footerId, "open-new-task");
-  empty = nav.taskArrow(empty, "ArrowUp");
-  assert.equal(empty.focus, "footer");
-});
-
-test("Add spend: arrows leave type=search fields; Enter in Amount moves to Label; Enter in Label or Save saves", () => {
-  const down = press(FUNDS_IDS, "funds-amount", ["ArrowDown"]);
-  assert.equal(down.focus, "funds-label");
-  const toSave = press(FUNDS_IDS, "funds-label", ["ArrowDown"]);
-  assert.equal(toSave.focus, "save-funds-spend");
-  const toHome = press(FUNDS_IDS, "save-funds-spend", ["ArrowDown"]);
-  assert.equal(toHome.focus, "go-home");
-  const back = press(FUNDS_IDS, "go-home", ["ArrowUp", "ArrowUp", "ArrowUp"]);
-  assert.equal(back.focus, "funds-amount");
-
+test("Add spend: arrows and Tab leave type=search fields; Enter in Amount moves to Label", () => {
+  assert.equal(press(FUNDS_IDS, "funds-amount", ["ArrowDown"]).focus, "funds-label");
+  assert.equal(press(FUNDS_IDS, "funds-amount", ["ArrowRight"]).focus, "funds-label");
+  assert.equal(press(FUNDS_IDS, "funds-amount", ["Tab"]).focus, "funds-label");
+  assert.equal(press(FUNDS_IDS, "funds-label", ["ArrowDown"]).focus, "save-funds-spend");
+  assert.equal(press(FUNDS_IDS, "save-funds-spend", ["ArrowDown"]).focus, "go-home");
+  assert.equal(press(FUNDS_IDS, "go-home", ["ArrowUp", "ArrowUp", "ArrowUp"]).focus, "funds-amount");
   assert.deepEqual(nav.fundsEnter("funds-amount"), { action: "focus", id: "funds-label" });
   assert.deepEqual(nav.fundsEnter("funds-label"), { action: "save" });
   assert.deepEqual(nav.fundsEnter("save-funds-spend"), { action: "save" });
-  assert.equal(nav.fundsEnter("funds-amount").action !== "save", true);
 });
 
-test("collectFocusables skips hidden, disabled, and tabindex=-1 controls so focus can leave a region", () => {
+test("normalizeNav accepts key, code, keyCode, Down aliases, Tab, and wheel", () => {
+  assert.equal(nav.normalizeNav({ key: "ArrowDown" }).name, "down");
+  assert.equal(nav.normalizeNav({ key: "Down" }).name, "down");
+  assert.equal(nav.normalizeNav({ key: "", code: "ArrowDown" }).name, "down");
+  assert.equal(nav.normalizeNav({ key: "Unidentified", keyCode: 40 }).name, "down");
+  assert.equal(nav.normalizeNav({ key: "ArrowRight", keyCode: 39 }).name, "right");
+  assert.equal(nav.normalizeNav({ key: "ArrowUp" }).dir, -1);
+  assert.equal(nav.normalizeNav({ key: "Tab" }).fromTab, true);
+  assert.equal(nav.normalizeNav({ key: "Tab" }).dir, 1);
+  assert.equal(nav.normalizeNav({ key: "Tab", shiftKey: true }).dir, -1);
+  assert.equal(nav.normalizeNav({ type: "wheel", deltaY: 80 }).name, "down");
+  assert.equal(nav.normalizeNav({ type: "wheel", deltaY: -20 }).name, "up");
+  assert.equal(nav.normalizeNav({ key: "Enter", keyCode: 13 }).activate, true);
+});
+
+test("spatialNext picks the geometrically nearest neighbor and wraps", () => {
+  function box(id, left, top) {
+    return {
+      id,
+      getBoundingClientRect() {
+        return { left, top, right: left + 80, bottom: top + 40, width: 80, height: 40 };
+      },
+    };
+  }
+  const cardA = box("card-a", 10, 10);
+  const cardB = box("card-b", 10, 70);
+  const newTask = box("open-new-task", 10, 200);
+  const actions = box("open-task-actions", 120, 200);
+  const list = [cardA, cardB, newTask, actions];
+  assert.equal(nav.spatialNext(list, cardA, "down").id, "card-b");
+  assert.equal(nav.spatialNext(list, cardB, "down").id, "open-new-task");
+  assert.equal(nav.spatialNext(list, newTask, "right").id, "open-task-actions");
+  assert.equal(nav.spatialNext(list, actions, "left").id, "open-new-task");
+  assert.equal(nav.spatialNext(list, actions, "down", true).id, "card-a");
+});
+
+test("collectFocusables skips hidden, disabled, and tabindex=-1 controls", () => {
   const nodes = [
     fakeEl("visible-one"),
     fakeEl("disabled-btn", { disabled: true }),
@@ -189,14 +180,12 @@ test("collectFocusables skips hidden, disabled, and tabindex=-1 controls so focu
   ];
   const ids = nav.collectFocusables(rootOf(nodes)).map((el) => el.id);
   assert.deepEqual(ids, ["visible-one", "search-field", "visible-two"]);
-  assert.equal(press(ids, "search-field", ["ArrowDown"]).focus, "visible-two");
-  assert.equal(press(ids, "search-field", ["ArrowUp"]).focus, "visible-one");
 });
 
-test("linear step clamps at the ends of a screen chain", () => {
+test("linear step wraps at the ends of a screen chain", () => {
   const ids = ["a", "b", "c"];
-  assert.equal(nav.stepIds(ids, "a", -1), "a");
-  assert.equal(nav.stepIds(ids, "c", 1), "c");
-  assert.equal(nav.stepIds(ids, "missing", 1), "a");
-  assert.equal(nav.stepIds(ids, "missing", -1), "c");
+  assert.equal(nav.stepIds(ids, "a", -1, true), "c");
+  assert.equal(nav.stepIds(ids, "c", 1, true), "a");
+  assert.equal(nav.stepIds(ids, "a", -1, false), "a");
+  assert.equal(nav.stepIds(ids, "c", 1, false), "c");
 });

@@ -86,6 +86,10 @@
   let clockTimer = null;
   let prompterRaf = null;
   let prompterPlay = null;
+  let renderedScreen = null;
+  let inputEventLog = [];
+  const INPUT_DEBUG_KEY = "thespia.hud.inputDebug";
+  const INPUT_LOG_MAX = 5;
 
   if (previewHint) previewHint.hidden = false;
 
@@ -485,6 +489,113 @@
     clockTimer = setInterval(tickClock, 10000);
   }
 
+  function appVersionLabel() {
+    const nav = window.WorldStaticFocusNav;
+    const ver = (nav && nav.APP_VERSION) || "v14";
+    return el("p", { className: "app-version", id: "app-version", text: ver });
+  }
+
+  function inputDebugEnabled() {
+    try {
+      return localStorage.getItem(INPUT_DEBUG_KEY) === "1";
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function setInputDebugEnabled(on) {
+    try {
+      localStorage.setItem(INPUT_DEBUG_KEY, on ? "1" : "0");
+    } catch (_err) {
+      /* ignore quota */
+    }
+    syncInputDebugOverlay();
+  }
+
+  function escapeDebugText(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function syncInputDebugOverlay() {
+    let box = document.getElementById("input-debug");
+    const on = inputDebugEnabled();
+    if (!on) {
+      if (box) box.hidden = true;
+      return;
+    }
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "input-debug";
+      box.setAttribute("aria-hidden", "true");
+      document.body.appendChild(box);
+    }
+    box.hidden = false;
+    if (!inputEventLog.length) {
+      box.innerHTML = "<p>Input debug · waiting for Neural Band events</p>";
+      return;
+    }
+    box.innerHTML = inputEventLog
+      .map((entry) => {
+        return (
+          "<p>" +
+          escapeDebugText(entry.type) +
+          " key=" +
+          escapeDebugText(entry.key) +
+          " code=" +
+          escapeDebugText(entry.code) +
+          " keyCode=" +
+          escapeDebugText(entry.keyCode) +
+          " deltaY=" +
+          escapeDebugText(entry.deltaY) +
+          "</p>"
+        );
+      })
+      .join("");
+  }
+
+  function logInputEvent(event) {
+    const nav = window.WorldStaticFocusNav;
+    const desc =
+      nav && typeof nav.describeEvent === "function"
+        ? nav.describeEvent(event)
+        : {
+            type: event && event.type,
+            key: event && event.key,
+            code: event && event.code,
+            keyCode: (event && (event.keyCode || event.which)) || 0,
+            deltaY: (event && event.deltaY) || 0,
+          };
+    inputEventLog.push(desc);
+    if (inputEventLog.length > INPUT_LOG_MAX) inputEventLog = inputEventLog.slice(-INPUT_LOG_MAX);
+    if (inputDebugEnabled()) syncInputDebugOverlay();
+  }
+
+  function toggleInputDebug() {
+    setInputDebugEnabled(!inputDebugEnabled());
+    const state = currentState();
+    if (state && (state.screen === "apps" || state.screen === "major-settings")) {
+      navigate({ ...state }, { push: false });
+    }
+  }
+
+  function inputDebugButton() {
+    const on = inputDebugEnabled();
+    return el(
+      "button",
+      {
+        type: "button",
+        className: on ? "secondary selected" : "secondary",
+        id: "toggle-input-debug",
+        onClick: toggleInputDebug,
+        attrs: { "aria-pressed": on ? "true" : "false" },
+      },
+      on ? "Debug on" : "Input debug"
+    );
+  }
+
   function header(eyebrow, title, meta) {
     return el("header", { className: "screen-header" }, [
       eyebrow ? el("p", { className: "eyebrow", text: eyebrow }) : null,
@@ -734,6 +845,7 @@
             el("div", { className: "hud-time-col" }, [
               el("h1", { id: "hud-clock", className: "hud-clock", text: formatTime(now) }),
               el("p", { id: "hud-date", className: "hud-date", text: formatDate(now) }),
+              appVersionLabel(),
             ]),
             fundsBadge(funds),
           ]),
@@ -777,10 +889,11 @@
     return screen(
       [
         header("World Static", "Apps", "Arrow to a tile, then Enter"),
+        appVersionLabel(),
         el("div", { className: "content stack" }, [
           el("div", { className: "tile-grid", attrs: { role: "list" } }, appTiles()),
         ]),
-        el("div", { className: "footer" }, [homeButton()]),
+        el("div", { className: "footer" }, [inputDebugButton(), homeButton()]),
       ],
       "apps-screen"
     );
@@ -801,7 +914,7 @@
             : null,
           el("p", {
             className: "hint",
-            text: "Type an amount and press Enter. It is added to today's total and stays on this device.",
+            text: "Type an amount. Enter moves to the label; Enter on the label or Save adds it to today's total. It stays on this device.",
           }),
           el("div", { className: "field-wrap stack" }, [
             el("label", { htmlFor: "funds-amount", text: "Amount" }),
@@ -1072,9 +1185,14 @@
   }
 
   function scrollTalkThread() {
-    const thread = document.getElementById("talk-thread");
-    if (!thread) return;
-    thread.scrollTop = thread.scrollHeight;
+    const target = document.getElementById("major-message") || document.getElementById("talk-thread-end");
+    if (target && typeof target.scrollIntoView === "function") {
+      try {
+        target.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch (_err) {
+        target.scrollIntoView(false);
+      }
+    }
   }
 
   function typingDots() {
@@ -1106,7 +1224,7 @@
       );
     }
     if (role === "user") {
-      return el("div", { className: "talk-row talk-row-me", id: rowId, tabIndex: 0 }, [
+      return el("button", { type: "button", className: "talk-row talk-row-me", id: rowId }, [
         el("div", { className: "talk-bubble-col" }, [
           el("div", { className: "talk-bubble talk-bubble-me" }, [
             el("p", { className: "talk-bubble-text", text: message.text || "" }),
@@ -1115,7 +1233,7 @@
         ]),
       ]);
     }
-    return el("div", { className: "talk-row talk-row-them", id: rowId, tabIndex: 0, dataset: { to } }, [
+    return el("button", { type: "button", className: "talk-row talk-row-them", id: rowId, dataset: { to } }, [
       avatarEl(to, "talk-avatar talk-avatar-sm"),
       el("div", { className: "talk-bubble-col" }, [
         el("div", { className: "talk-bubble talk-bubble-them" }, [
@@ -1129,11 +1247,11 @@
   function typingRow(to) {
     const name = talkName(to);
     return el(
-      "div",
+      "button",
       {
+        type: "button",
         className: "talk-row talk-row-them talk-typing-row",
         id: "talk-typing",
-        tabIndex: 0,
         dataset: { to },
         attrs: { "aria-label": `${name} is typing` },
       },
@@ -1573,7 +1691,8 @@
       el("div", { className: "footer" }, [
         el("button", { type: "button", className: "secondary primary", id: "save-major-settings", onClick: saveMajorSettings }, "Save"),
         el("button", { type: "button", className: "secondary", id: "clear-major-settings", onClick: clearMajorSettings }, "Clear"),
-        el("button", { type: "button", className: "secondary", onClick: () => navigate({ screen: "talk-picker" }) }, "Back"),
+        inputDebugButton(),
+        el("button", { type: "button", className: "secondary", id: "talk-settings-back", onClick: () => navigate({ screen: "talk-picker" }) }, "Back"),
       ]),
     ]);
   }
@@ -3301,8 +3420,10 @@
     return screen([
       header("Task Cards", sel.list ? sel.list.name : "Tasks", progress.total ? `${progress.done} of ${progress.total} done` : "No tasks yet"),
       el("div", { className: "content stack" }, [
-        el("p", { className: "task-switcher" }, [
-          el("span", { className: "task-switcher-hint", text: "Left / Right to change lists" }),
+        el("div", { className: "task-switcher" }, [
+          el("button", { type: "button", className: "secondary", id: "task-list-prev", onClick: () => shiftTaskList(state, -1) }, "Prev list"),
+          el("span", { className: "task-switcher-name", text: sel.list ? sel.list.name : "Tasks" }),
+          el("button", { type: "button", className: "secondary", id: "task-list-next", onClick: () => shiftTaskList(state, 1) }, "Next list"),
         ]),
         el("div", { className: "stack", attrs: { role: "list" } }, items),
         state.notice ? el("p", { className: "status", text: state.notice, dataset: { kind: state.noticeKind || "" } }) : null,
@@ -4223,6 +4344,8 @@
 
   function render(state) {
     const screenName = state && state.screen ? state.screen : "home";
+    const prevFocusId = document.activeElement && document.activeElement.id ? document.activeElement.id : "";
+    const sameScreen = renderedScreen === screenName;
     if (screenName !== "home") stopClock();
     if (screenName !== "prompter-play") {
       stopPrompterAnim();
@@ -4407,6 +4530,7 @@
         lastFocusSelector = "#open-apps";
     }
     app.append(view);
+    renderedScreen = screenName;
     if (screenName === "home") startClock();
     if (screenName === "prompter-play" && prompterPlay) {
       const scroll = document.getElementById("prompter-scroll");
@@ -4416,17 +4540,28 @@
         startPrompterAnim();
       });
     }
+    let target = null;
+    if (sameScreen && prevFocusId) {
+      try {
+        target = app.querySelector("#" + CSS.escape(prevFocusId));
+      } catch (_err) {
+        target = document.getElementById(prevFocusId);
+        if (target && !app.contains(target)) target = null;
+      }
+    }
+    if (!target && lastFocusSelector) target = app.querySelector(lastFocusSelector);
+    if (target && typeof target.focus === "function") target.focus();
     window.requestAnimationFrame(() => {
       if (screenName === "talk" || screenName === "major") scrollTalkThread();
-      const target = lastFocusSelector ? app.querySelector(lastFocusSelector) : null;
-      if (target && typeof target.focus === "function") {
-        target.focus();
-        if (typeof target.scrollIntoView === "function") {
-          try {
-            target.scrollIntoView({ block: "nearest", inline: "nearest" });
-          } catch (_err) {
-            target.scrollIntoView(false);
-          }
+      const active = document.activeElement;
+      const lost = !active || !app.contains(active) || active === app || active === document.body;
+      const node = lost ? target || (lastFocusSelector ? app.querySelector(lastFocusSelector) : null) : active;
+      if (node && typeof node.focus === "function" && lost) node.focus();
+      if (node && typeof node.scrollIntoView === "function") {
+        try {
+          node.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } catch (_err) {
+          node.scrollIntoView(false);
         }
       }
     });
@@ -4567,73 +4702,95 @@
     return true;
   }
 
-  function moveLinearFocus(dir, current) {
+  function moveLinearFocus(dir, current, spatialName) {
     const nav = focusNavApi();
     const items = screenFocusables();
     if (!items.length) return false;
-    const next = nav && typeof nav.step === "function" ? nav.step(items, current || document.activeElement, dir) : null;
+    let next = null;
+    if (nav && typeof nav.spatialNext === "function" && spatialName) {
+      next = nav.spatialNext(items, current || document.activeElement, spatialName, true);
+    }
+    if (!next && nav && typeof nav.step === "function") {
+      next = nav.step(items, current || document.activeElement, dir, true);
+    }
     if (!next) return false;
     return focusNode(next);
   }
 
-  function handleTaskListArrow(state, event) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return false;
-    const nav = focusNavApi();
-    const sel = resolveTaskSelection(state);
-    const footerIds = (nav && nav.TASK_FOOTER_IDS) || ["open-new-task", "open-task-actions", "open-task-lists", "go-home"];
-    const target = event.target;
-    const footerId = target && footerIds.indexOf(target.id) >= 0 ? target.id : "";
-    const model = nav && typeof nav.taskArrow === "function"
-      ? nav.taskArrow(
-          {
-            focus: footerId ? "footer" : "list",
-            taskIndex: sel.taskIndex,
-            taskCount: sel.tasks.length,
-            footerIndex: footerId ? footerIds.indexOf(footerId) : 0,
-            footerIds: footerIds,
-          },
-          event.key
-        )
-      : null;
-    if (!model) return false;
-    event.preventDefault();
-    if (model.focus === "footer") {
-      return focusNode(document.getElementById(model.footerId || "open-new-task"));
-    }
-    if (model.taskIndex !== sel.taskIndex) {
-      shiftTaskIndex(state, model.taskIndex > sel.taskIndex ? 1 : -1);
-      return true;
-    }
-    return focusNode(document.getElementById("selected-task"));
+  function ownsCustomArrows(state, event, nav) {
+    const screenName = state && state.screen;
+    const id = event && event.target && event.target.id;
+    const name = nav && nav.name;
+    if (screenName === "prompter-play" && !isTypingTarget(event.target)) return true;
+    if (screenName === "scale-convert" && id === "scale-value-panel") return true;
+    if (screenName === "recipe" && id === "step-panel" && (name === "left" || name === "right")) return true;
+    if (screenName === "scale-category" && id === "scale-entry-panel" && (name === "left" || name === "right")) return true;
+    return false;
   }
 
-  function handleLinearArrow(event) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return false;
+  function handleDirectionalMove(event, nav) {
+    if (!nav || !nav.dir) return false;
     const state = currentState();
-    const screenName = state && state.screen;
-    if (screenName === "prompter-play") return false;
-    if (screenName === "scale-convert" && event.target && event.target.id === "scale-value-panel") return false;
-    if (screenName === "tasks") return handleTaskListArrow(state, event);
+    if (ownsCustomArrows(state, event, nav)) return false;
+    /* Wheel on a button should still scroll the page. Arrows are intercepted
+       so type=search fields stay in the same focus order as buttons. */
+    if ((event.type === "wheel" || event.type === "mousewheel") && !isTypingTarget(event.target) && !nav.fromTab) {
+      return false;
+    }
     event.preventDefault();
-    moveLinearFocus(event.key === "ArrowDown" ? 1 : -1, event.target);
+    if (typeof event.stopPropagation === "function") event.stopPropagation();
+    const spatial = nav.spatial || (nav.dir > 0 ? "down" : "up");
+    moveLinearFocus(nav.dir, event.target, spatial);
     return true;
+  }
+
+  function onTaskFocusIn(event) {
+    const btn = event.target && event.target.closest ? event.target.closest(".task-item") : null;
+    if (!btn || !app.contains(btn)) return;
+    const state = currentState();
+    if (!state || state.screen !== "tasks") return;
+    const list = app.querySelectorAll(".screen .task-item");
+    const index = Array.prototype.indexOf.call(list, btn);
+    if (index < 0) return;
+    list.forEach((el, i) => {
+      el.classList.toggle("is-selected", i === index);
+      el.id = i === index ? "selected-task" : "task-item-" + i;
+    });
+    try {
+      history.replaceState(
+        { ...state, taskIndex: index, taskId: (btn.dataset && btn.dataset.taskId) || state.taskId },
+        ""
+      );
+    } catch (_err) {
+      /* ignore */
+    }
+  }
+
+  function onCaptureInput(event) {
+    logInputEvent(event);
+    const navApi = focusNavApi();
+    const nav = navApi && typeof navApi.normalizeNav === "function" ? navApi.normalizeNav(event) : null;
+    if (!nav || (!nav.dir && !nav.activate)) return;
+    if (nav.dir) handleDirectionalMove(event, nav);
   }
 
   function onGlobalKeyDown(event) {
     const state = currentState();
-    if (event.key === "Enter" && event.target && event.target.id === "question") {
+    const navApi = focusNavApi();
+    const nav = navApi && typeof navApi.normalizeNav === "function" ? navApi.normalizeNav(event) : null;
+    const keyIsEnter = Boolean(nav && nav.activate);
+    if (keyIsEnter && event.target && event.target.id === "question") {
       event.preventDefault();
       submitQuestion();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "major-message") {
+    if (keyIsEnter && event.target && event.target.id === "major-message") {
       event.preventDefault();
       submitMajorMessage();
       return;
     }
-    if (event.key === "Enter" && event.target && (event.target.id === "funds-amount" || event.target.id === "funds-label" || event.target.id === "save-funds-spend")) {
-      const nav = focusNavApi();
-      const action = nav && typeof nav.fundsEnter === "function" ? nav.fundsEnter(event.target.id) : null;
+    if (keyIsEnter && event.target && (event.target.id === "funds-amount" || event.target.id === "funds-label" || event.target.id === "save-funds-spend")) {
+      const action = navApi && typeof navApi.fundsEnter === "function" ? navApi.fundsEnter(event.target.id) : null;
       event.preventDefault();
       if (action && action.action === "focus") {
         const next = document.getElementById(action.id);
@@ -4643,136 +4800,123 @@
       submitAddSpend();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "funds-budget") {
+    if (keyIsEnter && event.target && event.target.id === "funds-budget") {
       event.preventDefault();
       submitFundsBudget();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "next-up-text") {
+    if (keyIsEnter && event.target && event.target.id === "next-up-text") {
       event.preventDefault();
       saveNextUpFromForm();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "task-title") {
+    if (keyIsEnter && event.target && event.target.id === "task-title") {
       event.preventDefault();
       const note = document.getElementById("task-note");
       if (note && typeof note.focus === "function") note.focus();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "task-note") {
+    if (keyIsEnter && event.target && event.target.id === "task-note") {
       event.preventDefault();
       const due = document.getElementById("task-due");
       if (due && typeof due.focus === "function") due.focus();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "task-due") {
+    if (keyIsEnter && event.target && event.target.id === "task-due") {
       event.preventDefault();
       saveTaskFromForm();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "task-list-name") {
+    if (keyIsEnter && event.target && event.target.id === "task-list-name") {
       event.preventDefault();
       saveTaskListName();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "script-title") {
+    if (keyIsEnter && event.target && event.target.id === "script-title") {
       event.preventDefault();
       const line = document.getElementById("script-line");
       if (line && typeof line.focus === "function") line.focus();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "script-line") {
+    if (keyIsEnter && event.target && event.target.id === "script-line") {
       event.preventDefault();
       appendPrompterLine();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "recipe-title") {
+    if (keyIsEnter && event.target && event.target.id === "recipe-title") {
       event.preventDefault();
       continueFromTitle();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "step-title") {
+    if (keyIsEnter && event.target && event.target.id === "step-title") {
       event.preventDefault();
       const body = document.getElementById("step-body");
       if (body && typeof body.focus === "function") body.focus();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "step-body") {
+    if (keyIsEnter && event.target && event.target.id === "step-body") {
       event.preventDefault();
       addStepFromForm();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "scale-parse-input") {
+    if (keyIsEnter && event.target && event.target.id === "scale-parse-input") {
       event.preventDefault();
       applyScaleQuery(currentState());
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "scale-stride-input") {
+    if (keyIsEnter && event.target && event.target.id === "scale-stride-input") {
       event.preventDefault();
       saveStrideFromForm();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "scale-measure-name") {
+    if (keyIsEnter && event.target && event.target.id === "scale-measure-name") {
       event.preventDefault();
       const size = document.getElementById("scale-measure-size");
       if (size && typeof size.focus === "function") size.focus();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "scale-measure-size") {
+    if (keyIsEnter && event.target && event.target.id === "scale-measure-size") {
       event.preventDefault();
       saveMeasurementFromForm();
       return;
     }
-    if (event.key === "Enter" && event.target && event.target.id === "scale-value-panel") {
+    if (keyIsEnter && event.target && event.target.id === "scale-value-panel") {
       event.preventDefault();
       const input = document.getElementById("scale-parse-input");
       if (input && typeof input.focus === "function") input.focus();
       return;
     }
-    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && handleLinearArrow(event)) return;
     if (isTypingTarget(event.target)) return;
     if (state && state.screen === "prompter-play") {
-      if (event.key === "Enter") {
+      if (keyIsEnter) {
         event.preventDefault();
         togglePrompterPause();
         return;
       }
-      if (event.key === "ArrowUp") {
+      if (nav && nav.name === "up") {
         event.preventDefault();
         nudgePrompterSpeed(1);
         return;
       }
-      if (event.key === "ArrowDown") {
+      if (nav && nav.name === "down") {
         event.preventDefault();
         nudgePrompterSpeed(-1);
         return;
       }
-      if (event.key === "ArrowLeft") {
+      if (nav && nav.name === "left") {
         event.preventDefault();
         jumpPrompterSegment(-1);
         return;
       }
-      if (event.key === "ArrowRight") {
+      if (nav && nav.name === "right") {
         event.preventDefault();
         jumpPrompterSegment(1);
         return;
       }
     }
-    if (state && state.screen === "tasks") {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        shiftTaskList(state, -1);
-        return;
-      }
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        shiftTaskList(state, 1);
-        return;
-      }
-    }
     if (state && state.screen === "scale-pace") {
       const id = event.target && event.target.id;
-      if (event.key === "Enter" && id !== "scale-reset" && id !== "go-back" && id !== "go-home" && id !== "save-stride") {
+      if (keyIsEnter && id !== "scale-reset" && id !== "go-back" && id !== "go-home" && id !== "save-stride") {
         event.preventDefault();
         addPaceStep();
         return;
@@ -4780,48 +4924,48 @@
     }
     if (state && state.screen === "scale-convert") {
       const onPanel = event.target && event.target.id === "scale-value-panel";
-      if (onPanel) {
-        if (event.key === "ArrowUp") {
+      if (onPanel && nav) {
+        if (nav.name === "up") {
           event.preventDefault();
           nudgeConverterValue(state, 1);
           return;
         }
-        if (event.key === "ArrowDown") {
+        if (nav.name === "down") {
           event.preventDefault();
           nudgeConverterValue(state, -1);
           return;
         }
-        if (event.key === "ArrowLeft") {
+        if (nav.name === "left") {
           event.preventDefault();
           nudgeConverterStep(state, -1);
           return;
         }
-        if (event.key === "ArrowRight") {
+        if (nav.name === "right") {
           event.preventDefault();
           nudgeConverterStep(state, 1);
           return;
         }
       }
     }
-    if (state && state.screen === "recipe") {
-      if (event.key === "ArrowLeft") {
+    if (state && state.screen === "recipe" && event.target && event.target.id === "step-panel" && nav) {
+      if (nav.name === "left") {
         event.preventDefault();
         updateStep(state, (state.step || 0) - 1);
         return;
       }
-      if (event.key === "ArrowRight") {
+      if (nav.name === "right") {
         event.preventDefault();
         updateStep(state, (state.step || 0) + 1);
         return;
       }
     }
-    if (state && state.screen === "scale-category") {
-      if (event.key === "ArrowLeft") {
+    if (state && state.screen === "scale-category" && event.target && event.target.id === "scale-entry-panel" && nav) {
+      if (nav.name === "left") {
         event.preventDefault();
         updateScaleCategory(state, (state.entryIndex || 0) - 1);
         return;
       }
-      if (event.key === "ArrowRight") {
+      if (nav.name === "right") {
         event.preventDefault();
         updateScaleCategory(state, (state.entryIndex || 0) + 1);
         return;
@@ -4861,6 +5005,20 @@
 
   function registerWorker() {
     if (!("serviceWorker" in navigator)) return;
+    try {
+      if (new URLSearchParams(location.search).has("no-sw")) return;
+    } catch (_err) {
+      /* ignore */
+    }
+    if (!registerWorker.bound) {
+      registerWorker.bound = true;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloaded) return;
+        reloaded = true;
+        window.location.reload();
+      });
+    }
     navigator.serviceWorker.register("./sw.js").catch((error) => {
       console.warn("Offline support is unavailable:", error);
     });
@@ -4901,13 +5059,17 @@
     await checkHealth();
     await loadScaleLibrary();
     render(currentState());
+    syncInputDebugOverlay();
     registerWorker();
   }
 
   window.addEventListener("popstate", (event) => {
     render(event.state && event.state.screen ? event.state : HOME_STATE);
   });
+  document.addEventListener("keydown", onCaptureInput, true);
+  document.addEventListener("wheel", onCaptureInput, { capture: true, passive: false });
   document.addEventListener("keydown", onGlobalKeyDown);
+  document.addEventListener("focusin", onTaskFocusIn);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
   } else {

@@ -201,8 +201,15 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         if 'type: "search"' not in window:
             failures.append("funds-amount must use type=search")
 
-    if "speechSynthesis" not in js or "ArrowLeft" not in js:
+    focus_nav = (ROOT / "focus-nav.js").read_text(encoding="utf-8")
+    if "speechSynthesis" not in js or ("ArrowLeft" not in js and "ArrowLeft" not in focus_nav):
         failures.append("input or TTS hooks missing")
+    if "app-version" not in js or "v14" not in js:
+        failures.append("Home/Apps must show a v14 version label")
+    if "toggle-input-debug" not in js or "input-debug" not in js:
+        failures.append("Input debug overlay toggle missing")
+    if "keydown" not in js or "capture" not in js:
+        failures.append("arrow keys must be handled in the capture phase")
     if "thespia.hud.favorites" not in js:
         failures.append("favorites key missing from app.js")
 
@@ -474,14 +481,18 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v13" not in sw and "${CACHE_PREFIX}v13" not in sw:
-        failures.append("service worker cache version should be v13")
+    if "thespia-blueprint-help-v14" not in sw and "${CACHE_PREFIX}v14" not in sw:
+        failures.append("service worker cache version should be v14")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
     if "funds.js" not in sw or "hud-bg.png" not in sw:
         failures.append("service worker must precache funds.js and the HUD background")
     if "focus-nav.js" not in sw:
         failures.append("service worker must precache focus-nav.js")
+    if "skipWaiting" not in sw or "clients.claim" not in sw:
+        failures.append("service worker must skipWaiting and clients.claim so v14 can replace a stuck v13 cache")
+    if "isNetworkFirst" not in sw:
+        failures.append("service worker must fetch HTML/JS network-first")
 
     # The Scale Check tile must be available, not coming soon.
     tile_start = js.find('id: "scale"')
@@ -996,6 +1007,19 @@ def main() -> int:
         out = (nav_test.stdout or "") + (nav_test.stderr or "")
         for line in out.strip().splitlines()[-12:]:
             failures.append(f"nav: {line}")
+
+    spatial_test = subprocess.run(
+        ["node", str(ROOT / "scripts/test_spatial_nav.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    if spatial_test.returncode != 0:
+        failures.append("600x600 Chromium arrow-key walk failed")
+        out = (spatial_test.stdout or "") + (spatial_test.stderr or "")
+        for line in out.strip().splitlines()[-20:]:
+            failures.append(f"spatial: {line}")
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],

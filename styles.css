@@ -47,7 +47,7 @@ body {
   grid-template-rows: minmax(0, 1fr);
   inline-size: 100%;
   block-size: 100%;
-  overflow: hidden;
+  overflow: auto;
   background-color: #000;
   background-image: url("./icons/hud-bg.png");
   background-size: cover;
@@ -91,11 +91,12 @@ body {
 }
 
 .screen {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   inline-size: 100%;
-  block-size: 100%;
-  overflow: hidden;
+  min-block-size: 100%;
+  block-size: auto;
+  overflow: visible;
   padding: 1.35rem 1.4rem 1.2rem;
   min-inline-size: 0;
 }
@@ -148,7 +149,8 @@ h2 {
 .content {
   min-inline-size: 0;
   min-block-size: 0;
-  overflow: auto;
+  overflow: visible;
+  flex: 1 0 auto;
 }
 
 .stack {
@@ -301,12 +303,23 @@ input::placeholder {
 }
 
 .footer {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.footer > button,
+.footer > a {
+  inline-size: 100%;
+}
+
+.hud-footer,
+.footer:has(> :only-child) {
+  grid-template-columns: 1fr;
 }
 
 .step-card {
@@ -885,8 +898,22 @@ p.scale-lines {
 }
 
 .screen.prompter-play {
-  padding: 0.85rem 0.9rem 0.75rem;
+  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0.85rem 0.9rem 0.75rem;
+  block-size: 100%;
+  min-block-size: 100%;
+  overflow: hidden;
+}
+
+.screen.prompter-play .content {
+  overflow: hidden;
+  flex: none;
+  min-block-size: 0;
+}
+
+.screen.prompter-play .footer {
+  margin-top: 0.75rem;
 }
 
 .prompter-meta {
@@ -1071,7 +1098,7 @@ button.kind-toggle:focus-visible {
 
 /* Talk messenger thread — outline bubbles on a black additive display */
 .screen.talk-thread-screen {
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  /* One document flow so Chromium spatial nav can reach composer + footer. */
 }
 
 .talk-thread {
@@ -1080,8 +1107,23 @@ button.kind-toggle:focus-visible {
   gap: 0.55rem;
   min-inline-size: 0;
   min-block-size: 0;
-  overflow: auto;
+  overflow: visible;
+  flex: 1 0 auto;
   padding: 0.1rem 0.05rem 0.35rem;
+}
+
+button.talk-row,
+button.talk-typing-row {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  inline-size: 100%;
 }
 
 .talk-empty {
@@ -1253,4 +1295,47 @@ button.talk-retry .talk-ts {
     animation: none;
     opacity: 0.8;
   }
+}
+
+.app-version {
+  margin: 0.15rem 0 0;
+  color: #8d8d8d;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+}
+
+#input-debug {
+  position: fixed;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  z-index: 40;
+  max-inline-size: 18rem;
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  background: #000;
+  border: 1px solid #7ee0ff;
+  border-radius: 0.4rem;
+  color: #c8f4ff;
+  font-size: 0.62rem;
+  line-height: 1.3;
+  letter-spacing: 0;
+  pointer-events: none;
+  text-transform: none;
+}
+
+#input-debug[hidden] {
+  display: none;
+}
+
+#input-debug p {
+  margin: 0;
+  color: inherit;
+}
+
+.task-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
 }
