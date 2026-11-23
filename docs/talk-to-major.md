@@ -30,6 +30,29 @@ Do this after the Worker is deployed and the glasses app is on GitHub Pages (`ht
 
 Preview mode remains available as a fallback if Settings are cleared.
 
+
+## One-tap setup link
+
+After the app update is published, a setup link can turn on the live relay in one tap, without typing the URL or token on the glasses.
+
+The link uses only a URL fragment, never a query string, so the token is not sent to GitHub Pages or any other server:
+
+`https://worldstatic.github.io/thespia-glasses/#talk-setup=<payload>`
+
+The payload is the base64url encoding of a JSON object shaped like `{ "relayUrl": "https://your-worker.example", "token": "your-device-token" }`. Use placeholder values here; never put a real token or Worker URL in this repository.
+
+When the app loads that link it:
+
+1. Reads `location.hash` only
+2. Checks that `relayUrl` is an `https:` URL and that a token is present
+3. Saves the config on the device through the Talk transport (`kind` is `relay`)
+4. Clears the fragment right away with `history.replaceState` (it does not use `pushState`)
+5. Shows a short card: “Talk is set up. Live relay is on.”
+
+If the link is invalid, the fragment is still cleared and existing Talk settings are left unchanged. The service worker never sees or caches the fragment. The app does not log the token.
+
+Anyone who has a real setup link can message your relay, so treat it like a password and delete it after you have opened it once on the glasses (or in the Meta app browser). You can still paste the same values by hand in Talk → Settings.
+
 ## Privacy
 
 Do not put work CSVs, customer data, passwords, or personal files in Talk, in this repo, or in Worker logs. The Worker is written not to log message text. Rotate the device and reply tokens if one is ever shared by mistake.

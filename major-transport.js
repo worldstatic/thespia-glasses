@@ -386,6 +386,98 @@
     }
   }
 
+
+  function decodeBase64Url(input) {
+    const trimmed = String(input || "").split("&")[0].split("#")[0];
+    let s = trimmed.replace(/-/g, "+").replace(/_/g, "/");
+    const missing = s.length % 4;
+    if (missing) s += "=".repeat(4 - missing);
+    const binary = atob(s);
+    let out = "";
+    for (let i = 0; i < binary.length; i += 1) {
+      out += "%" + binary.charCodeAt(i).toString(16).padStart(2, "0");
+    }
+    try {
+      return decodeURIComponent(out);
+    } catch (_err) {
+      return binary;
+    }
+  }
+
+  function isHttpsRelayUrl(value) {
+    try {
+      const url = new URL(String(value || "").trim());
+      return url.protocol === "https:" && Boolean(url.host);
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function parseTalkSetupFragment(hash) {
+    // Only the URL fragment is accepted. Query strings are ignored.
+    const raw = String(hash || "");
+    const fragment = raw.includes("#") ? raw.slice(raw.indexOf("#") + 1) : raw.startsWith("talk-setup=") ? raw : "";
+    const marker = "talk-setup=";
+    if (!fragment.startsWith(marker)) return { ok: false, attempted: false };
+    const encoded = fragment.slice(marker.length).split("&")[0];
+    if (!encoded) return { ok: false, attempted: true, error: "invalid" };
+    let parsed;
+    try {
+      parsed = JSON.parse(decodeBase64Url(encoded));
+    } catch (_err) {
+      return { ok: false, attempted: true, error: "invalid" };
+    }
+    if (!parsed || typeof parsed !== "object") {
+      return { ok: false, attempted: true, error: "invalid" };
+    }
+    const relayUrl = typeof parsed.relayUrl === "string" ? parsed.relayUrl.trim() : "";
+    const token = typeof parsed.token === "string" ? parsed.token : "";
+    if (!isHttpsRelayUrl(relayUrl) || !String(token).trim()) {
+      return { ok: false, attempted: true, error: "invalid" };
+    }
+    return { ok: true, attempted: true, relayUrl, token };
+  }
+
+  function clearTalkSetupFragment(loc, hist) {
+    const place = loc || global.location;
+    const historyApi = hist || global.history;
+    if (!place || !historyApi || typeof historyApi.replaceState !== "function") return;
+    const path = (place.pathname || "/") + (place.search || "");
+    try {
+      historyApi.replaceState(historyApi.state || {}, "", path);
+    } catch (_err) {
+      try {
+        place.hash = "";
+      } catch (_ignored) {}
+    }
+    if (place.hash && place.hash !== "#" && place.hash !== "") {
+      try {
+        place.hash = "";
+      } catch (_ignored) {}
+    }
+  }
+
+  function consumeTalkSetup(loc, hist) {
+    const place = loc || global.location;
+    const hash = place && place.hash ? place.hash : "";
+    const parsed = parseTalkSetupFragment(hash);
+    if (parsed.attempted) {
+      clearTalkSetupFragment(place, hist || global.history);
+    }
+    if (parsed.ok) {
+      saveConfig({
+        kind: "relay",
+        relayUrl: parsed.relayUrl,
+        token: parsed.token,
+        endpoint: parsed.relayUrl,
+        pollUrl: "",
+      });
+      // Do not return or log the token.
+      return { ok: true, attempted: true };
+    }
+    return { ok: false, attempted: parsed.attempted, error: parsed.error };
+  }
+
   const api = {
     CONFIG_KEY,
     THREADS_KEY,
@@ -403,6 +495,9 @@
     loadThread,
     lastExchange,
     appendThread,
+    parseTalkSetupFragment,
+    consumeTalkSetup,
+    isHttpsRelayUrl,
   };
 
   global.ThespiaMajor = api;

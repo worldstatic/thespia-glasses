@@ -75,7 +75,7 @@ Favorites, recipes, tasks, scripts, measurements, and your stride stay in `local
 
 The Talk tile opens a picker with original outline avatars for **Major** and **C 2**. Each person has a separate thread stored in `localStorage` on the device. The chat panel uses a `type=search` field so the on-glasses composer (and dictation) can open, a Send button, short reply cards you page with Left/Right, and optional read-aloud. While a live reply is in flight, the display shows “Major is thinking...” or “C 2 is thinking...”
 
-There is no official public chat API for Grok Bot in this app. Live replies use a Cloudflare Worker you control, with the Worker URL and device token pasted in Settings on the device (`type=search` fields). Until that is configured, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. See [docs/talk-to-major.md](docs/talk-to-major.md) for setup.
+There is no official public chat API for Grok Bot in this app. Live replies use a Cloudflare Worker you control, with the Worker URL and device token pasted in Settings on the device (`type=search` fields). Until that is configured, a mock transport returns practice replies and sends nothing off the device. The shipped code contains no endpoint URLs, tokens, or secrets. A one-tap setup link can also store those values from a URL fragment; see [docs/talk-to-major.md](docs/talk-to-major.md).
 
 ## AI answers for Blueprint Help (optional)
 

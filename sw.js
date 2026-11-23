@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "thespia-blueprint-help-";
-const CACHE_NAME = `${CACHE_PREFIX}v7`;
+const CACHE_NAME = `${CACHE_PREFIX}v8`;
 const APP_SHELL = [
   new URL("./", self.registration.scope).href,
   new URL("./index.html", self.registration.scope).href,
@@ -42,13 +42,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
+  // Fragments are not sent to fetch() and must never be written to the cache.
+  url.hash = "";
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (url.pathname.includes("/api/")) return;
 
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request);
+      const cached = await cache.match(url.href);
       if (cached) return cached;
       try {
         const response = await fetch(request);

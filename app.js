@@ -665,6 +665,37 @@
     });
   }
 
+
+  function renderTalkSetup(state) {
+    const ok = !(state && state.error);
+    return screen([
+      header("Talk", ok ? "Ready" : "Setup link", ok ? "Live relay is on." : "The link could not be used."),
+      el("div", { className: "content stack" }, [
+        el("article", { className: "card", id: "talk-setup-card" }, [
+          el("p", {
+            className: "step-body",
+            text: ok
+              ? "Talk is set up. Live relay is on."
+              : "That setup link was not valid. Your Talk settings were not changed.",
+          }),
+        ]),
+      ]),
+      el("div", { className: "footer" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "secondary primary",
+            id: "talk-setup-open",
+            onClick: () => navigate({ screen: "talk-picker" }),
+          },
+          "Talk"
+        ),
+        homeButton(),
+      ]),
+    ]);
+  }
+
   function renderTalkPicker() {
     const api = majorApi();
     const status = api ? api.statusLabel() : "Talk is unavailable.";
@@ -3670,6 +3701,10 @@
         view = renderComingSoon(state);
         lastFocusSelector = "#go-home";
         break;
+      case "talk-setup":
+        view = renderTalkSetup(state);
+        lastFocusSelector = "#talk-setup-open";
+        break;
       case "talk-picker":
         view = renderTalkPicker();
         lastFocusSelector = "#talk-pick-major";
@@ -4150,7 +4185,23 @@
   }
 
   async function start() {
-    history.replaceState(HOME_STATE, "");
+    let setup = null;
+    const talk = majorApi();
+    if (talk && typeof talk.consumeTalkSetup === "function") {
+      try {
+        setup = talk.consumeTalkSetup();
+      } catch (_err) {
+        setup = { ok: false, attempted: true, error: "invalid" };
+        try {
+          const path = (location.pathname || "/") + (location.search || "");
+          history.replaceState(history.state || {}, "", path);
+        } catch (_ignored) {}
+      }
+    }
+    const initial = setup && setup.attempted
+      ? { screen: "talk-setup", error: setup.ok ? "" : "invalid" }
+      : HOME_STATE;
+    history.replaceState(initial, "");
     try {
       await loadLibrary();
     } catch (err) {

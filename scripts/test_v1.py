@@ -117,6 +117,14 @@ def check_home_and_major(js: str, css: str, html: str, transport: str, failures:
         failures.append("relay transport must send a to field")
     if "https://" in transport:
         failures.append("major-transport.js must not include an https URL")
+    if "parseTalkSetupFragment" not in transport or "consumeTalkSetup" not in transport:
+        failures.append("major-transport.js missing one-tap setup helpers")
+    if "talk-setup=" not in transport:
+        failures.append("major-transport.js missing talk-setup fragment marker")
+    if "Talk is set up. Live relay is on." not in js:
+        failures.append("app.js missing Talk setup confirmation copy")
+    if "consumeTalkSetup" not in js:
+        failures.append("app.js must apply the setup fragment on load")
     if "speechSynthesis" not in js or "ArrowLeft" not in js:
         failures.append("input or TTS hooks missing")
     if "thespia.hud.favorites" not in js:
@@ -390,8 +398,8 @@ def check_scale_check(js: str, css: str, html: str, sw: str, failures: list[str]
         failures.append("styles.css missing Scale Check readout rules")
     if "scale.js" not in sw or "scale-library.json" not in sw:
         failures.append("service worker missing scale.js or scale-library.json")
-    if "thespia-blueprint-help-v7" not in sw and "${CACHE_PREFIX}v7" not in sw:
-        failures.append("service worker cache version should be v7")
+    if "thespia-blueprint-help-v8" not in sw and "${CACHE_PREFIX}v8" not in sw:
+        failures.append("service worker cache version should be v8")
     if "logo.svg" not in sw or "icon-192.png" not in sw or "avatar-major.svg" not in sw or "avatar-c2.svg" not in sw:
         failures.append("service worker missing logo, 192 icon, or Talk avatars")
 
@@ -855,6 +863,18 @@ def main() -> int:
     check_scale_check(js, css, html, sw, failures)
     check_task_cards(js, css, html, sw, failures)
     check_teleprompter(js, css, html, sw, failures)
+
+    setup_test = subprocess.run(
+        ["node", "--test", str(ROOT / "scripts/test_talk_setup.mjs")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if setup_test.returncode != 0:
+        failures.append("talk setup fragment tests failed")
+        out = (setup_test.stdout or "") + (setup_test.stderr or "")
+        for line in out.strip().splitlines()[-12:]:
+            failures.append(f"talk-setup: {line}")
 
     proc = subprocess.Popen(
         [sys.executable, str(ROOT / "server/ask_server.py")],
